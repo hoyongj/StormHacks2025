@@ -57,7 +57,6 @@ function App() {
             plans={plans}
             selectedPlanId={selectedPlanId}
             onSelectPlan={setSelectedPlanId}
-            onCreateNew={handleCreateNew}
           />
         </aside>
 
@@ -67,7 +66,7 @@ function App() {
               <MapView plan={selectedPlan} />
             </div>
             <div className="app__to-go">
-              <ToGoList plan={selectedPlan} />
+              <ToGoList plan={selectedPlan} onCreateNew={handleCreateNew} />
             </div>
           </div>
           <TripAdvisor plan={selectedPlan} />
