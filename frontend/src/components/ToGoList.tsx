@@ -13,11 +13,15 @@ function ToGoList({ plan, onCreateNew }: ToGoListProps) {
   return (
     <section className="to-go">
       <header className="to-go__header">
-        <p className="to-go__eyebrow">To Go</p>
-        <h3>{plan ? 'Upcoming stops' : 'Pick a plan to see your route'}</h3>
-        <button type="button" className="info__create" onClick={onCreateNew}>
-          + New Plan
-        </button>
+        <div className="to-go__header-row">
+          <div>
+            <p className="to-go__eyebrow">To Go</p>
+            <h3>{plan ? 'Upcoming stops' : 'Pick a plan to see your route'}</h3>
+          </div>
+          <button type="button" className="info__create" onClick={onCreateNew}>
+            Generate Plan
+          </button>
+        </div>
       </header>
       <ol className="to-go__list">
         {stops.length ? (

@@ -9,8 +9,15 @@
 }
 
 .to-go__header {
-  display: grid;
-  gap: 0.25rem;
+  padding-bottom: 0.5rem;
+}
+
+.to-go__header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  width: 100%;
+  gap: 1rem;
 }
 
 .to-go__eyebrow {
