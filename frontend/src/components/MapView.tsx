@@ -1,35 +1,226 @@
-import { TravelPlan } from '../App';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Loader } from '@googlemaps/js-api-loader';
+import type { PlanStop, TravelPlan } from '../App';
 import './MapView.css';
 
 type MapViewProps = {
   plan: TravelPlan | null;
 };
 
+const DEFAULT_CENTER: google.maps.LatLngLiteral = { lat: 49.2796, lng: -122.9199 }; // Burnaby, BC
+const MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
 function MapView({ plan }: MapViewProps) {
-  if (!plan) {
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const markersRef = useRef<google.maps.Marker[]>([]);
+  const cacheRef = useRef(new Map<string, google.maps.LatLngLiteral>());
+  const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
+  const [mapError, setMapError] = useState<string | null>(null);
+
+  const loader = useMemo(() => {
+    if (!MAPS_KEY) {
+      return null;
+    }
+    return new Loader({ apiKey: MAPS_KEY, version: 'weekly', libraries: ['places'] });
+  }, [MAPS_KEY]);
+
+  useEffect(() => {
+    if (!canvasRef.current || !loader) {
+      return;
+    }
+
+    let cancelled = false;
+
+    loader
+      .load()
+      .then((google) => {
+        if (cancelled || !canvasRef.current) {
+          return;
+        }
+
+        setMapError(null);
+        mapRef.current = new google.maps.Map(canvasRef.current, {
+          center: DEFAULT_CENTER,
+          zoom: 12,
+          streetViewControl: false,
+          fullscreenControl: false,
+          mapTypeControl: false,
+        });
+        infoWindowRef.current = new google.maps.InfoWindow();
+      })
+      .catch((error) => setMapError(error instanceof Error ? error.message : 'Failed to load Maps SDK'));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loader]);
+
+  useEffect(() => {
+    if (!plan) {
+      clearMarkers();
+      return;
+    }
+
+    if (!loader || !mapRef.current) {
+      return;
+    }
+
+    let active = true;
+
+    loader.load().then((google) => {
+      if (!active) {
+        return;
+      }
+
+      const map = mapRef.current;
+      if (!map) {
+        return;
+      }
+
+      const geocoder = new google.maps.Geocoder();
+      const stops = plan.stops.slice(0, 6);
+      setMapError(null);
+
+      Promise.all(stops.map((stop) => geocodeStop(stop, geocoder, cacheRef.current)))
+        .then((results) => {
+          if (!active) {
+            return;
+          }
+
+          clearMarkers();
+          const bounds = new google.maps.LatLngBounds();
+
+          results.forEach((result, index) => {
+            if (!result) {
+              return;
+            }
+
+            bounds.extend(result.position);
+
+            const marker = new google.maps.Marker({
+              position: result.position,
+              map,
+              label: `${index + 1}`,
+              title: result.label,
+            });
+
+            marker.addListener('click', () => {
+              if (!infoWindowRef.current) {
+                return;
+              }
+              const title = escapeHtml(result.label);
+              const details = result.description ? `<p>${escapeHtml(result.description)}</p>` : '';
+              infoWindowRef.current.setContent(
+                `<div class="map__info-window"><strong>${title}</strong>${details}</div>`
+              );
+              infoWindowRef.current.open({ map, anchor: marker });
+            });
+
+            markersRef.current.push(marker);
+          });
+
+          if (!markersRef.current.length) {
+            map.setCenter(DEFAULT_CENTER);
+            map.setZoom(11);
+          } else if (markersRef.current.length === 1) {
+            map.setCenter(markersRef.current[0].getPosition() ?? DEFAULT_CENTER);
+            map.setZoom(13);
+          } else {
+            map.fitBounds(bounds, 48);
+          }
+        })
+        .catch(() => {
+          if (active) {
+            setMapError('Unable to plot stops on the map right now.');
+          }
+        });
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [plan, loader]);
+
+  if (!MAPS_KEY) {
     return (
       <div className="map">
-        <div className="map__empty">Select a plan to preview the route.</div>
+        <div className="map__message">
+          Add `VITE_GOOGLE_MAPS_API_KEY` to your environment to enable the live map view.
+        </div>
       </div>
     );
   }
 
   return (
     <div className="map">
-      <div className="map__placeholder">
-        <span className="map__label">Route Overview</span>
-        <ol>
-          {plan.stops.map((stop, index) => (
-            <li key={stop.label + index}>
-              <span className="map__stop-title">{stop.label}</span>
-              {stop.description ? <span className="map__stop-desc">{stop.description}</span> : null}
-            </li>
-          ))}
-        </ol>
-        <p className="map__hint">Google Maps visualization coming soon.</p>
-      </div>
+      <div ref={canvasRef} className="map__canvas" />
+      {!plan ? (
+        <div className="map__message">Select a plan to preview the route.</div>
+      ) : null}
+      {mapError ? <div className="map__message map__message--error">{mapError}</div> : null}
     </div>
   );
+
+  function clearMarkers() {
+    markersRef.current.forEach((marker) => marker.setMap(null));
+    markersRef.current = [];
+    infoWindowRef.current?.close();
+  }
+}
+
+type GeocodeResult = {
+  label: string;
+  description?: string;
+  position: google.maps.LatLngLiteral;
+};
+
+async function geocodeStop(
+  stop: Pick<PlanStop, 'label' | 'description' | 'placeId'>,
+  geocoder: google.maps.Geocoder,
+  cache: Map<string, google.maps.LatLngLiteral>
+): Promise<GeocodeResult | null> {
+  const { label, description, placeId } = stop;
+  const cacheKey = placeId ?? label;
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    return { label, description, position: cached };
+  }
+
+  return new Promise((resolve) => {
+    const request: google.maps.GeocoderRequest = placeId
+      ? { placeId }
+      : { address: label };
+
+    geocoder.geocode(request, (results, status) => {
+      if (status === 'OK' && results && results[0]) {
+        const location = results[0].geometry.location.toJSON();
+        cache.set(cacheKey, location);
+        resolve({ label, description, position: location });
+      } else {
+        resolve(null);
+      }
+    });
+  });
 }
 
 export default MapView;
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>'"]/g, (char) => {
+    switch (char) {
+      case '&':
+        return '&amp;';
+      case '<':
+        return '&lt;';
+      case '>':
+        return '&gt;';
+      case "'":
+        return '&#39;';
+      case '"':
+        return '&quot;';
+      default:
+        return char;
+    }
+  });
+}

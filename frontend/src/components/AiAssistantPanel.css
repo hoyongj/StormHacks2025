@@ -1,0 +1,49 @@
+.assistant {
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 1.75rem 1.5rem;
+  box-shadow: 0 1px 18px rgba(15, 23, 42, 0.12);
+  display: grid;
+  gap: 1rem;
+}
+
+.assistant__eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.7rem;
+  color: #2cb1bc;
+  margin: 0;
+}
+
+.assistant h3 {
+  margin: 0;
+}
+
+.assistant__card {
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(44, 177, 188, 0.12), rgba(127, 90, 240, 0.12));
+  padding: 1rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.assistant__card ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.assistant__cta {
+  border: none;
+  border-radius: 10px;
+  padding: 0.6rem 1.2rem;
+  background: #7f5af0;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: not-allowed;
+}
+
+.assistant__cta:disabled {
+  opacity: 0.6;
+}

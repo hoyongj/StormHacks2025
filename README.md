@@ -6,6 +6,7 @@ Collaborative travel planning platform built for StormHacks 2025. Pathfinder let
 - Guided prompt workflow to request food, scenery, and custom detours between major stops.
 - Plan history sidebar and info panel aligned with the initial wireframe for quick context switching.
 - FastAPI backend prepared for Google Gemini content generation and Google Maps route lookups.
+- Live Google Map embed that highlights generated stops once a key is configured.
 - Containerized React + Nginx frontend and Python backend orchestrated via `docker-compose`.
 
 ## Project Structure
@@ -59,6 +60,8 @@ Collaborative travel planning platform built for StormHacks 2025. Pathfinder let
    ```
 3. Visit `http://localhost:5173`. The React client proxies API calls to `http://localhost:8000` when running locally.
 
+> Tip: Vite reads environment variables prefixed with `VITE_`. Create `frontend/.env.local` with `VITE_GOOGLE_MAPS_API_KEY=...` (or export the variable in your shell) before running the dev server to unlock the interactive Google Map.
+
 ## Docker Workflow
 
 Ensure Docker Desktop (or compatible runtime) is running, then from the repository root execute:
@@ -71,11 +74,19 @@ This spins up:
 
 ## Environment Variables
 
-The backend expects Google credentials when you connect real services:
+The stack expects Google credentials when you connect real services:
 - `GEMINI_API_KEY`
 - `GOOGLE_MAPS_API_KEY`
+- `VITE_GOOGLE_MAPS_API_KEY`
 
-You can export them in your shell before `docker-compose up`, or place them in a `.env` file alongside `docker-compose.yml` (Compose reads it automatically). Without keys, the app falls back to deterministic mock data so the UI remains interactive.
+Copy `.env.example` to `.env` in the project root and replace the placeholder values. The `.env` file is git-ignored and is automatically consumed by Docker Compose:
+
+```bash
+cp .env.example .env
+# then edit .env to insert your actual keys
+```
+
+`VITE_GOOGLE_MAPS_API_KEY` is used at build time by the React app; point it to the same value as `GOOGLE_MAPS_API_KEY` unless you maintain separate public keys. You can also export the variables in your shell if you prefer. Without keys, the app falls back to deterministic mock data so the UI remains interactive, but the Google Map will display an overlay prompting you to add a key.
 
 ## Next Steps
 - Integrate official Google Gemini SDK and replace the mocked `GeminiClient` implementation.
