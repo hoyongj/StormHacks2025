@@ -1,11 +1,13 @@
+import React from 'react';
 import type { TravelPlan } from '../App';
 import './ToGoList.css';
 
 type ToGoListProps = {
   plan: TravelPlan | null;
+  onCreateNew: () => void;
 };
 
-function ToGoList({ plan }: ToGoListProps) {
+function ToGoList({ plan, onCreateNew }: ToGoListProps) {
   const stops = plan?.stops ?? [];
 
   return (
@@ -13,6 +15,9 @@ function ToGoList({ plan }: ToGoListProps) {
       <header className="to-go__header">
         <p className="to-go__eyebrow">To Go</p>
         <h3>{plan ? 'Upcoming stops' : 'Pick a plan to see your route'}</h3>
+        <button type="button" className="info__create" onClick={onCreateNew}>
+          + New Plan
+        </button>
       </header>
       <ol className="to-go__list">
         {stops.length ? (

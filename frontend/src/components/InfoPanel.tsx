@@ -6,10 +6,9 @@ type InfoPanelProps = {
   plans: TravelPlan[];
   selectedPlanId: string;
   onSelectPlan: (planId: string) => void;
-  onCreateNew: () => void;
 };
 
-function InfoPanel({ plan, plans, selectedPlanId, onSelectPlan, onCreateNew }: InfoPanelProps) {
+function InfoPanel({ plan, plans, selectedPlanId, onSelectPlan}: InfoPanelProps) {
   return (
     <div className="info">
       <header className="info__header">
@@ -17,9 +16,6 @@ function InfoPanel({ plan, plans, selectedPlanId, onSelectPlan, onCreateNew }: I
           <p className="info__eyebrow">Trip Summary</p>
           <h2>{plan?.title ?? 'Select a plan'}</h2>
         </div>
-        <button type="button" className="info__create" onClick={onCreateNew}>
-          + New Plan
-        </button>
       </header>
 
       <section className="info__section info__section--summary">
