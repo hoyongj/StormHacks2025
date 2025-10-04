@@ -53,14 +53,21 @@
 }
 
 .app__content {
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: 1.5rem;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: 0;
+}
+
+.app__primary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 1.5rem;
+  align-items: stretch;
   min-height: 0;
 }
 
 .app__map {
-  flex: 1;
   background: #ffffff;
   border-radius: 24px;
   padding: 0.75rem;
@@ -75,6 +82,15 @@
   flex: 1;
 }
 
+.app__to-go {
+  min-height: 0;
+  display: flex;
+}
+
+.app__to-go > .to-go {
+  flex: 1;
+}
+
 .app__assistant {
   display: flex;
   width: 100%;
@@ -85,6 +101,14 @@
     grid-template-columns: 1fr;
     grid-template-rows: auto auto auto;
     padding: 1.5rem;
+  }
+
+  .app__content {
+    grid-template-rows: auto auto;
+  }
+
+  .app__primary {
+    grid-template-columns: 1fr;
   }
 
   .app__assistant {

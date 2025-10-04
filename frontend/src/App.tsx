@@ -3,6 +3,7 @@ import MapView from './components/MapView';
 import InfoPanel from './components/InfoPanel';
 import TripAdvisor from './components/TripAdvisor';
 import AiAssistantPanel from './components/AiAssistantPanel';
+import ToGoList from './components/ToGoList';
 import './App.css';
 
 export type PlanStop = {
@@ -61,8 +62,13 @@ function App() {
         </aside>
 
         <section className="app__content">
-          <div className="app__map">
-            <MapView plan={selectedPlan} />
+          <div className="app__primary">
+            <div className="app__map">
+              <MapView plan={selectedPlan} />
+            </div>
+            <div className="app__to-go">
+              <ToGoList plan={selectedPlan} />
+            </div>
           </div>
           <TripAdvisor plan={selectedPlan} />
         </section>
