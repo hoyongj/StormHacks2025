@@ -1,0 +1,21 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f2f2f7;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+textarea {
+  font-family: inherit;
+}
+
+#root {
+  min-height: 100vh;
+}

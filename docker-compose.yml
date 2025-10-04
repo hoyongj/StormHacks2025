@@ -1,0 +1,27 @@
+version: '3.9'
+
+services:
+  backend:
+    build: ./backend
+    container_name: pathfinder-backend
+    ports:
+      - '8000:8000'
+    environment:
+      GEMINI_API_KEY: "${GEMINI_API_KEY:-demo}"
+      GOOGLE_MAPS_API_KEY: "${GOOGLE_MAPS_API_KEY:-demo}"
+    networks:
+      - pathfinder
+
+  frontend:
+    build: ./frontend
+    container_name: pathfinder-frontend
+    ports:
+      - '5173:80'
+    depends_on:
+      - backend
+    networks:
+      - pathfinder
+
+networks:
+  pathfinder:
+    driver: bridge
