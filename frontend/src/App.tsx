@@ -715,7 +715,9 @@ function App() {
   return (
     <div className="app">
       <header className="app__header">
-        <h1>Pathfinder</h1>
+        <button type="button" className="app__logo" onClick={() => setView('planner')}>
+          Pathfinder
+        </button>
         <div className="app__header-actions">
           {view !== 'planner' ? (
             <button

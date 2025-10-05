@@ -41,9 +41,19 @@
   box-shadow: 0 1px 8px rgba(15, 23, 42, 0.08);
 }
 
-.app__header h1 {
+.app__logo {
   font-size: 1.6rem;
+  font-weight: 700;
   margin: 0;
+  border: none;
+  background: none;
+  color: #16192c;
+  cursor: pointer;
+  padding: 0;
+}
+
+.app__logo:hover {
+  color: #2cb1bc;
 }
 
 .app__header-actions {
