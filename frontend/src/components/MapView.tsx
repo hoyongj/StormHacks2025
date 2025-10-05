@@ -9,13 +9,16 @@ type MapViewProps = {
 
 const DEFAULT_CENTER: google.maps.LatLngLiteral = { lat: 49.2796, lng: -122.9199 }; // Burnaby, BC
 const EMBEDDED_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+const MAPS_MAP_ID: string = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID || 'DEMO_MAP_ID';
 
 function MapView({ plan }: MapViewProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.Marker[]>([]);
+  const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
   const cacheRef = useRef(new Map<string, google.maps.LatLngLiteral>());
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
+  const routeRef = useRef<google.maps.Polyline | null>(null);
+  const planIdRef = useRef<string | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapsKey, setMapsKey] = useState<string | null>(EMBEDDED_MAPS_KEY ?? null);
   const [isLoadingKey, setIsLoadingKey] = useState(!EMBEDDED_MAPS_KEY);
@@ -70,7 +73,7 @@ function MapView({ plan }: MapViewProps) {
     if (!mapsKey) {
       return null;
     }
-    return new Loader({ apiKey: mapsKey, version: 'weekly', libraries: ['places'] });
+    return new Loader({ apiKey: mapsKey, version: 'weekly', libraries: ['places', 'marker'] });
   }, [mapsKey]);
 
   useEffect(() => {
@@ -88,13 +91,15 @@ function MapView({ plan }: MapViewProps) {
         }
 
         setMapError(null);
-        mapRef.current = new google.maps.Map(canvasRef.current, {
+        const options: google.maps.MapOptions = {
           center: DEFAULT_CENTER,
           zoom: 12,
           streetViewControl: false,
           fullscreenControl: false,
           mapTypeControl: false,
-        });
+        };
+        options.mapId = MAPS_MAP_ID;
+        mapRef.current = new google.maps.Map(canvasRef.current, options);
         infoWindowRef.current = new google.maps.InfoWindow();
       })
       .catch((error) => setMapError(error instanceof Error ? error.message : 'Failed to load Maps SDK'));
@@ -105,8 +110,11 @@ function MapView({ plan }: MapViewProps) {
   }, [loader]);
 
   useEffect(() => {
+    planIdRef.current = plan?.id ?? null;
+
     if (!plan) {
       clearMarkers();
+      clearRoute();
       return;
     }
 
@@ -146,12 +154,7 @@ function MapView({ plan }: MapViewProps) {
 
             bounds.extend(result.position);
 
-            const marker = new google.maps.Marker({
-              position: result.position,
-              map,
-              label: `${index + 1}`,
-              title: result.label,
-            });
+            const marker = createMarker(map, result.position, result.label, index + 1);
 
             marker.addListener('click', () => {
               if (!infoWindowRef.current) {
@@ -172,11 +175,14 @@ function MapView({ plan }: MapViewProps) {
             map.setCenter(DEFAULT_CENTER);
             map.setZoom(11);
           } else if (markersRef.current.length === 1) {
-            map.setCenter(markersRef.current[0].getPosition() ?? DEFAULT_CENTER);
+            const singlePosition = getMarkerPosition(markersRef.current[0]) ?? DEFAULT_CENTER;
+            map.setCenter(singlePosition);
             map.setZoom(13);
           } else {
             map.fitBounds(bounds, 48);
           }
+
+          loadRoute(plan.id, google);
         })
         .catch(() => {
           if (active) {
@@ -216,9 +222,46 @@ function MapView({ plan }: MapViewProps) {
   );
 
   function clearMarkers() {
-    markersRef.current.forEach((marker) => marker.setMap(null));
+    markersRef.current.forEach((marker) => {
+      marker.map = null;
+    });
     markersRef.current = [];
     infoWindowRef.current?.close();
+  }
+
+  function clearRoute() {
+    routeRef.current?.setMap(null);
+    routeRef.current = null;
+  }
+
+  async function loadRoute(planId: string, google: typeof window.google) {
+    clearRoute();
+    try {
+      const response = await fetch(`/api/plan/${planId}/route`);
+      if (!response.ok) {
+        return;
+      }
+      const payload: { polyline: string } = await response.json();
+      if (!payload.polyline) {
+        return;
+      }
+      if (planIdRef.current !== planId) {
+        return;
+      }
+      const path = decodePolyline(payload.polyline);
+      if (!path.length || !mapRef.current) {
+        return;
+      }
+      routeRef.current = new google.maps.Polyline({
+        path,
+        strokeColor: '#1a3cff',
+        strokeOpacity: 0.85,
+        strokeWeight: 4,
+      });
+      routeRef.current.setMap(mapRef.current);
+    } catch (error) {
+      setMapError('Unable to draw the route right now.');
+    }
   }
 }
 
@@ -229,12 +272,19 @@ type GeocodeResult = {
 };
 
 async function geocodeStop(
-  stop: Pick<PlanStop, 'label' | 'description' | 'placeId'>,
+  stop: Pick<PlanStop, 'label' | 'description' | 'placeId' | 'latitude' | 'longitude'>,
   geocoder: google.maps.Geocoder,
   cache: Map<string, google.maps.LatLngLiteral>
 ): Promise<GeocodeResult | null> {
-  const { label, description, placeId } = stop;
+  const { label, description, placeId, latitude, longitude } = stop;
   const cacheKey = placeId ?? label;
+
+  if (typeof latitude === 'number' && typeof longitude === 'number') {
+    const position = { lat: latitude, lng: longitude };
+    cache.set(cacheKey, position);
+    return { label, description, position };
+  }
+
   const cached = cache.get(cacheKey);
   if (cached) {
     return { label, description, position: cached };
@@ -259,6 +309,41 @@ async function geocodeStop(
 
 export default MapView;
 
+function decodePolyline(encoded: string): google.maps.LatLngLiteral[] {
+  let index = 0;
+  const length = encoded.length;
+  const path: google.maps.LatLngLiteral[] = [];
+  let lat = 0;
+  let lng = 0;
+
+  while (index < length) {
+    let result = 0;
+    let shift = 0;
+    let byte: number;
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+    const deltaLat = result & 1 ? ~(result >> 1) : result >> 1;
+    lat += deltaLat;
+
+    result = 0;
+    shift = 0;
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+    const deltaLng = result & 1 ? ~(result >> 1) : result >> 1;
+    lng += deltaLng;
+
+    path.push({ lat: lat / 1e5, lng: lng / 1e5 });
+  }
+
+  return path;
+}
+
 function escapeHtml(value: string): string {
   return value.replace(/[&<>'"]/g, (char) => {
     switch (char) {
@@ -276,4 +361,36 @@ function escapeHtml(value: string): string {
         return char;
     }
   });
+}
+
+function createMarkerContent(index: number): HTMLElement {
+  const element = document.createElement('div');
+  element.className = 'map__marker';
+  element.textContent = `${index}`;
+  return element;
+}
+
+function createMarker(
+  map: google.maps.Map,
+  position: google.maps.LatLngLiteral,
+  title: string,
+  index: number
+): google.maps.marker.AdvancedMarkerElement {
+  return new google.maps.marker.AdvancedMarkerElement({
+    position,
+    map,
+    title,
+    content: createMarkerContent(index),
+    gmpClickable: true,
+  });
+}
+
+function getMarkerPosition(
+  marker: google.maps.marker.AdvancedMarkerElement
+): google.maps.LatLngLiteral | google.maps.LatLng | null {
+  const position = marker.position;
+  if (!position) {
+    return null;
+  }
+  return position instanceof google.maps.LatLng ? position : (position as google.maps.LatLngLiteral);
 }

@@ -36,3 +36,17 @@
   margin: 0.25rem 0 0;
   font-size: 0.85rem;
 }
+
+.map__marker {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1a3cff, #4b6cff);
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.85rem;
+  display: grid;
+  place-items: center;
+  border: 2px solid #ffffff;
+  box-shadow: 0 4px 8px rgba(17, 24, 39, 0.25);
+}

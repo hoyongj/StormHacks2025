@@ -20,6 +20,11 @@ class PlanStop(BaseModel):
         default=None,
         description="Optional place identifier (e.g., Google Place ID)",
     )
+    latitude: Optional[float] = Field(default=None, description="Latitude in decimal degrees.")
+    longitude: Optional[float] = Field(default=None, description="Longitude in decimal degrees.")
+
+    class Config:
+        allow_population_by_field_name = True
 
 
 class TravelPlan(BaseModel):
@@ -29,7 +34,10 @@ class TravelPlan(BaseModel):
     title: str
     summary: str
     stops: List[PlanStop]
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.utcnow, alias="createdAt")
+
+    class Config:
+        allow_population_by_field_name = True
 
 
 class PromptRequest(BaseModel):
