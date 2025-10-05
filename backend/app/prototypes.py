@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Iterable, List, Optional
 
 from .schemas import *
+from .schema_prototypes import *
 
 
 class AIChatbotInterface:
