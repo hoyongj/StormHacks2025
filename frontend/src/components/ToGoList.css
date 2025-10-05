@@ -114,11 +114,33 @@
   transition: background 0.15s ease, color 0.15s ease;
 }
 
+.to-go__action--toggle {
+  border-color: rgba(127, 90, 240, 0.25);
+  background: rgba(127, 90, 240, 0.1);
+  color: #4a3fa6;
+}
+
+.to-go__action--toggle:hover {
+  background: rgba(127, 90, 240, 0.2);
+}
+
 .to-go__action:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
+
+.to-go__action--ghost {
+  border: 1px dashed rgba(127, 90, 240, 0.4);
+  background: rgba(127, 90, 240, 0.08);
+  color: #4a3fa6;
+  grid-column: 1 / -1;
+  justify-self: flex-start;
+}
+
+.to-go__action--ghost:hover {
+  background: rgba(127, 90, 240, 0.18);
+}
 .to-go__action--danger:not(:disabled) {
   border-color: rgba(228, 56, 94, 0.35);
   color: #e4385e;
@@ -195,6 +217,11 @@
 .to-go__item:hover {
   transform: translateY(-2px);
   box-shadow: 0 10px 22px rgba(127, 90, 240, 0.18);
+}
+
+.to-go__item--open {
+  border-color: rgba(127, 90, 240, 0.35);
+  background: rgba(127, 90, 240, 0.12);
 }
 
 .to-go__item--selected {
@@ -409,4 +436,13 @@
     width: 28px;
     height: 28px;
   }
+}
+
+.to-go__item-select > div {
+  display: flex;
+  align-items: center;
+}
+
+.to-go__field-grid--coordinates {
+  margin-top: 0.45rem;
 }

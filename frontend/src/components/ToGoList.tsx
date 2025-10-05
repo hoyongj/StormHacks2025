@@ -1,6 +1,6 @@
+import { useEffect, useState } from 'react';
 import type { PlanStop, TravelPlan } from '../App';
 import './ToGoList.css';
-
 
 type ToGoListProps = {
   plan: TravelPlan | null;
@@ -23,6 +23,15 @@ function ToGoList({
 }: ToGoListProps) {
   const stops = plan?.stops ?? [];
   const hasPlan = Boolean(plan);
+  const [expandedStops, setExpandedStops] = useState<Record<number, boolean>>({});
+
+  useEffect(() => {
+    setExpandedStops({});
+  }, [plan?.id]);
+
+  const toggleStopDetails = (index: number) => {
+    setExpandedStops((prev) => ({ ...prev, [index]: !prev[index] }));
+  };
 
   const handleLabelChange = (index: number, value: string) => {
     onUpdateStop?.(index, { label: value });
@@ -50,6 +59,85 @@ function ToGoList({
     }
 
     onUpdateStop?.(index, { [key]: numeric } as Partial<PlanStop>);
+  };
+
+  const clampToRange = (value: number, min: number, max: number): number => {
+    if (Number.isNaN(value)) {
+      return min;
+    }
+    return Math.min(Math.max(value, min), max);
+  };
+
+  const normalizeTimeParts = (days: number, hours: number, minutes: number) => {
+    const clampedDays = clampToRange(Math.floor(days), 0, 365);
+    const clampedHours = clampToRange(Math.floor(hours), 0, 23);
+    const clampedMinutes = clampToRange(Math.floor(minutes), 0, 59);
+    return {
+      timeToSpendDays: clampedDays,
+      timeToSpendHours: clampedHours,
+      timeToSpendMinutes: clampedMinutes,
+    };
+  };
+
+  const handleTimePieceChange = (
+    index: number,
+    field: 'timeToSpendDays' | 'timeToSpendHours' | 'timeToSpendMinutes',
+    rawValue: string,
+  ) => {
+    const parsed = Number(rawValue);
+    if (Number.isNaN(parsed) || parsed < 0) {
+      return;
+    }
+
+    const stop = stops[index];
+    if (!stop) {
+      return;
+    }
+
+    const parts = normalizeTimeParts(
+      field === 'timeToSpendDays' ? parsed : stop.timeToSpendDays ?? 0,
+      field === 'timeToSpendHours' ? parsed : stop.timeToSpendHours ?? 0,
+      field === 'timeToSpendMinutes' ? parsed : stop.timeToSpendMinutes ?? 0,
+    );
+
+    onUpdateStop?.(index, parts);
+  };
+
+  const handleTimeClear = (index: number) => {
+    onUpdateStop?.(index, {
+      timeToSpendDays: undefined,
+      timeToSpendHours: undefined,
+      timeToSpendMinutes: undefined,
+    });
+  };
+
+  const handleToggleClick = (index: number) => {
+    toggleStopDetails(index);
+  };
+
+  const handleRemoveClick = (index: number) => {
+    if (!onRemoveStop) {
+      return;
+    }
+    onRemoveStop(index);
+    setExpandedStops((prev) => {
+      const next: Record<number, boolean> = {};
+      Object.entries(prev).forEach(([key, value]) => {
+        const currentIndex = Number(key);
+        if (currentIndex === index) {
+          return;
+        }
+        const newIndex = currentIndex > index ? currentIndex - 1 : currentIndex;
+        if (value) {
+          next[newIndex] = true;
+        }
+      });
+      return next;
+    });
+  };
+
+  const handleSelectStop = (stop: PlanStop, index: number) => {
+    onSelectStop?.(stop, index);
   };
 
   return (
@@ -82,26 +170,41 @@ function ToGoList({
         ) : stops.length ? (
           stops.map((stop, index) => {
             const isSelected = selectedStopIndex === index;
+            const isExpanded = expandedStops[index] ?? false;
             return (
               <li
-                key={`${stop.label}-${index}`}
-                className={isSelected ? 'to-go__item to-go__item--selected' : 'to-go__item'}
+                key={`${plan?.id ?? 'plan'}-${index}`}
+                className={[
+                  'to-go__item',
+                  isSelected ? 'to-go__item--selected' : '',
+                  isExpanded ? 'to-go__item--open' : '',
+                ].filter(Boolean).join(' ')}
               >
                 <div className="to-go__item-header">
-                  <button type="button" className="to-go__item-select" onClick={() => onSelectStop?.(stop, index)}>
+                  <button
+                    type="button"
+                    className="to-go__item-select"
+                    onClick={() => handleSelectStop(stop, index)}
+                    aria-pressed={isSelected}
+                  >
                     <span className="to-go__step">{index + 1}</span>
                     <div>
                       <span className="to-go__title">{stop.label || 'Untitled stop'}</span>
-                      {stop.description ? (
-                        <span className="to-go__desc">{stop.description}</span>
-                      ) : null}
                     </div>
                   </button>
                   <div className="to-go__item-actions">
                     <button
                       type="button"
+                      className="to-go__action to-go__action--toggle"
+                      onClick={() => handleToggleClick(index)}
+                      aria-expanded={isExpanded}
+                    >
+                      {isExpanded ? 'Hide details' : 'Show details'}
+                    </button>
+                    <button
+                      type="button"
                       className="to-go__action to-go__action--danger"
-                      onClick={() => onRemoveStop?.(index)}
+                      onClick={() => handleRemoveClick(index)}
                       disabled={!onRemoveStop}
                     >
                       Remove
@@ -109,60 +212,103 @@ function ToGoList({
                   </div>
                 </div>
 
-                <div className="to-go__item-editor">
-                  <label className="to-go__field">
-                    <span>Stop name</span>
-                    <input
-                      type="text"
-                      value={stop.label}
-                      onChange={(event) => handleLabelChange(index, event.target.value)}
-                      placeholder="Enter stop name"
-                    />
-                  </label>
-
-                  <label className="to-go__field">
-                    <span>Notes</span>
-                    <textarea
-                      value={stop.description ?? ''}
-                      onChange={(event) => handleDescriptionChange(index, event.target.value)}
-                      placeholder="Add optional notes"
-                      rows={2}
-                    />
-                  </label>
-
-                  <label className="to-go__field">
-                    <span>Place ID (optional)</span>
-                    <input
-                      type="text"
-                      value={stop.placeId ?? ''}
-                      onChange={(event) => handlePlaceIdChange(index, event.target.value)}
-                      placeholder="ChIJ..."
-                    />
-                  </label>
-
-                  <div className="to-go__field-grid">
-                    <label className="to-go__field to-go__field--compact">
-                      <span>Latitude</span>
+                {isExpanded ? (
+                  <div className="to-go__item-editor">
+                    <label className="to-go__field">
+                      <span>Stop name</span>
                       <input
-                        type="number"
-                        step="any"
-                        value={stop.latitude ?? ''}
-                        onChange={(event) => handleCoordinateChange(index, 'latitude', event.target.value)}
-                        placeholder="49.2827"
+                        type="text"
+                        value={stop.label}
+                        onChange={(event) => handleLabelChange(index, event.target.value)}
+                        placeholder="Enter stop name"
                       />
                     </label>
-                    <label className="to-go__field to-go__field--compact">
-                      <span>Longitude</span>
-                      <input
-                        type="number"
-                        step="any"
-                        value={stop.longitude ?? ''}
-                        onChange={(event) => handleCoordinateChange(index, 'longitude', event.target.value)}
-                        placeholder="-123.1207"
+
+                    <label className="to-go__field">
+                      <span>Notes</span>
+                      <textarea
+                        value={stop.description ?? ''}
+                        onChange={(event) => handleDescriptionChange(index, event.target.value)}
+                        placeholder="Add optional notes"
+                        rows={2}
                       />
                     </label>
+
+                    <label className="to-go__field">
+                      <span>Place ID (optional)</span>
+                      <input
+                        type="text"
+                        value={stop.placeId ?? ''}
+                        onChange={(event) => handlePlaceIdChange(index, event.target.value)}
+                        placeholder="ChIJ..."
+                      />
+                    </label>
+
+                    <div className="to-go__field-grid">
+                      <label className="to-go__field to-go__field--compact">
+                        <span>Days</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={stop.timeToSpendDays ?? ''}
+                          onChange={(event) => handleTimePieceChange(index, 'timeToSpendDays', event.target.value)}
+                          placeholder="0"
+                        />
+                      </label>
+                      <label className="to-go__field to-go__field--compact">
+                        <span>Hours</span>
+                        <input
+                          type="number"
+                          min="0"
+                          max="23"
+                          value={stop.timeToSpendHours ?? ''}
+                          onChange={(event) => handleTimePieceChange(index, 'timeToSpendHours', event.target.value)}
+                          placeholder="0"
+                        />
+                      </label>
+                      <label className="to-go__field to-go__field--compact">
+                        <span>Minutes</span>
+                        <input
+                          type="number"
+                          min="0"
+                          max="59"
+                          value={stop.timeToSpendMinutes ?? ''}
+                          onChange={(event) => handleTimePieceChange(index, 'timeToSpendMinutes', event.target.value)}
+                          placeholder="0"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="to-go__action to-go__action--ghost"
+                        onClick={() => handleTimeClear(index)}
+                      >
+                        Clear time
+                      </button>
+                    </div>
+                    <div className="to-go__field-grid to-go__field-grid--coordinates">
+                      <label className="to-go__field to-go__field--compact">
+                        <span>Latitude</span>
+                        <input
+                          type="number"
+                          step="any"
+                          value={stop.latitude ?? ''}
+                          onChange={(event) => handleCoordinateChange(index, 'latitude', event.target.value)}
+                          placeholder="49.2827"
+                        />
+                      </label>
+                      <label className="to-go__field to-go__field--compact">
+                        <span>Longitude</span>
+                        <input
+                          type="number"
+                          step="any"
+                          value={stop.longitude ?? ''}
+                          onChange={(event) => handleCoordinateChange(index, 'longitude', event.target.value)}
+                          placeholder="-123.1207"
+                        />
+                      </label>
+                    </div>
                   </div>
-                </div>
+                ) : null}
               </li>
             );
           })

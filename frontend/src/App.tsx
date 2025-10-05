@@ -12,6 +12,9 @@ export type PlanStop = {
   placeId?: string;
   latitude?: number;
   longitude?: number;
+  timeToSpendDays?: number;
+  timeToSpendHours?: number;
+  timeToSpendMinutes?: number;
 };
 
 export type TravelPlan = {
@@ -40,6 +43,9 @@ type PlanStopResponse = {
   placeId?: string;
   latitude?: number;
   longitude?: number;
+  timeToSpendDays?: number;
+  timeToSpendHours?: number;
+  timeToSpendMinutes?: number;
 };
 
 export type TripAdvisorInfo = {
@@ -512,6 +518,9 @@ function normalizePlan(plan: TravelPlanResponse): TravelPlan {
       placeId: stop.placeId,
       latitude: stop.latitude,
       longitude: stop.longitude,
+      timeToSpendDays: stop.timeToSpendDays,
+      timeToSpendHours: stop.timeToSpendHours,
+      timeToSpendMinutes: stop.timeToSpendMinutes,
     })),
   };
 }
