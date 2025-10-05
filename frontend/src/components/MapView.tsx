@@ -69,12 +69,12 @@ function MapView({ plan }: MapViewProps) {
     };
   }, []);
 
-  const loader = useMemo(() => {
-    if (!mapsKey) {
-      return null;
-    }
-    return new Loader({ apiKey: mapsKey, version: 'weekly', libraries: ['places', 'marker'] });
-  }, [mapsKey]);
+const loader = useMemo(() => {
+  if (!mapsKey) {
+    return null;
+  }
+  return new Loader({ apiKey: mapsKey, version: 'weekly', libraries: ['places', 'marker'] });
+}, [mapsKey]);
 
   useEffect(() => {
     if (!canvasRef.current || !loader) {

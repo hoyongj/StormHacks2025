@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Loader } from '@googlemaps/js-api-loader';
 import type { PlanStop, TravelPlan } from '../App';
 import './ToGoList.css';
 
@@ -64,6 +65,13 @@ function ToGoList({
   const isEditable = Boolean(onUpdateStop);
   const [expandedStops, setExpandedStops] = useState<Record<number, boolean>>({});
   const previousCountRef = useRef(formStops.length);
+  const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null);
+  const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
+  const predictionStoreRef = useRef<Record<number, google.maps.places.AutocompletePrediction[]>>({});
+  const [predictionTick, setPredictionTick] = useState(0);
+  const requestIdRef = useRef(0);
+  const loaderRef = useRef<Loader | null>(null);
+  const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
   useEffect(() => {
     setExpandedStops({});
@@ -89,16 +97,28 @@ function ToGoList({
     [allStopsLength, planStops, formStops],
   );
 
+  const predictionMap = useMemo(() => predictionStoreRef.current, [predictionTick]);
+
   const canSave = Boolean(isEditable && onSave && hasPendingChanges);
   const showUnsavedBadge = Boolean(isEditable && hasPendingChanges);
   const inputsDisabled = !isEditable;
 
   const toggleStopDetails = (index: number) => {
-    setExpandedStops((prev) => ({ ...prev, [index]: !prev[index] }));
+    setExpandedStops((prev) => {
+      const isOpen = !prev[index];
+      if (!isOpen && predictionStoreRef.current[index]) {
+        const next = { ...predictionStoreRef.current };
+        delete next[index];
+        predictionStoreRef.current = next;
+        setPredictionTick((tick) => tick + 1);
+      }
+      return { ...prev, [index]: isOpen };
+    });
   };
 
   const handleLabelChange = (index: number, value: string) => {
     onUpdateStop?.(index, { label: value });
+    fetchPredictions(index, value);
   };
 
   const handleDescriptionChange = (index: number, value: string) => {
@@ -196,10 +216,127 @@ function ToGoList({
       });
       return next;
     });
+    if (predictionStoreRef.current[index]) {
+      const next = { ...predictionStoreRef.current };
+      delete next[index];
+      predictionStoreRef.current = next;
+      setPredictionTick((tick) => tick + 1);
+    }
   };
 
   const handleSelectStopClick = (stop: PlanStop, index: number) => {
     onSelectStop?.(stop, index);
+  };
+
+  useEffect(() => {
+    if (!mapsApiKey || autocompleteServiceRef.current || typeof window === 'undefined') {
+      return;
+    }
+
+    const loader = (loaderRef.current ??= new Loader({
+      apiKey: mapsApiKey,
+      version: 'weekly',
+      libraries: ['places', 'marker'],
+    }));
+
+    let cancelled = false;
+    loader
+      .load()
+      .then((google) => {
+        if (cancelled) {
+          return;
+        }
+        autocompleteServiceRef.current = new google.maps.places.AutocompleteService();
+        placesServiceRef.current = new google.maps.places.PlacesService(document.createElement('div'));
+      })
+      .catch(() => {
+        autocompleteServiceRef.current = null;
+        placesServiceRef.current = null;
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mapsApiKey]);
+
+  const updatePredictions = (index: number, values: google.maps.places.AutocompletePrediction[] | null) => {
+    if (!values || !values.length) {
+      if (predictionStoreRef.current[index]) {
+        const next = { ...predictionStoreRef.current };
+        delete next[index];
+        predictionStoreRef.current = next;
+        setPredictionTick((tick) => tick + 1);
+      }
+      return;
+    }
+
+    predictionStoreRef.current = { ...predictionStoreRef.current, [index]: values };
+    setPredictionTick((tick) => tick + 1);
+  };
+
+  const fetchPredictions = (index: number, input: string) => {
+    if (!autocompleteServiceRef.current || !input.trim()) {
+      updatePredictions(index, null);
+      return;
+    }
+
+    const currentRequest = ++requestIdRef.current;
+    autocompleteServiceRef.current.getPlacePredictions({ input }, (predictions) => {
+      if (currentRequest !== requestIdRef.current) {
+        return;
+      }
+      if (!predictions || !predictions.length) {
+        updatePredictions(index, null);
+      } else {
+        updatePredictions(index, predictions);
+      }
+    });
+  };
+
+  const handlePredictionSelect = (
+    index: number,
+    prediction: google.maps.places.AutocompletePrediction
+  ) => {
+    updatePredictions(index, null);
+
+    const applySelection = (data: Partial<PlanStop>) => {
+      onUpdateStop?.(index, {
+        label: data.label ?? prediction.structured_formatting.main_text,
+        description:
+          data.description ??
+          prediction.structured_formatting.secondary_text ??
+          prediction.description,
+        placeId: data.placeId ?? prediction.place_id,
+        latitude: data.latitude,
+        longitude: data.longitude,
+      });
+    };
+
+    if (!placesServiceRef.current) {
+      applySelection({});
+      return;
+    }
+
+    placesServiceRef.current.getDetails(
+      {
+        placeId: prediction.place_id,
+        fields: ['name', 'formatted_address', 'geometry', 'place_id'],
+      },
+      (result, status) => {
+        if (status !== google.maps.places.PlacesServiceStatus.OK || !result) {
+          applySelection({});
+          return;
+        }
+
+        applySelection({
+          label: result.name ?? undefined,
+          description: result.formatted_address ?? undefined,
+          placeId: result.place_id ?? undefined,
+          latitude: result.geometry?.location?.lat(),
+          longitude: result.geometry?.location?.lng(),
+        });
+      }
+    );
   };
 
   return (
@@ -310,6 +447,30 @@ function ToGoList({
                       disabled={detailInputsDisabled}
                     />
                   </label>
+
+                  {isExpanded && (predictionMap[index]?.length ?? 0) ? (
+                    <ul className="to-go__suggestions" role="listbox">
+                      {predictionMap[index]!.map((prediction) => (
+                        <li key={prediction.place_id}>
+                          <button
+                            type="button"
+                            className="to-go__suggestion"
+                            onClick={() => handlePredictionSelect(index, prediction)}
+                            disabled={detailInputsDisabled}
+                          >
+                            <span className="to-go__suggestion-primary">
+                              {prediction.structured_formatting.main_text}
+                            </span>
+                            {prediction.structured_formatting.secondary_text ? (
+                              <span className="to-go__suggestion-secondary">
+                                {prediction.structured_formatting.secondary_text}
+                              </span>
+                            ) : null}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
 
                   <label className="to-go__field">
                     <span>Notes</span>

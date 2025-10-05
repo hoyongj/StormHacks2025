@@ -107,6 +107,16 @@ const PlanManager = ({
                             }
                             placeholder="Folder name"
                             className="manager__folder-input"
+                            onKeyDown={(event) => {
+                                if (event.key === 'Enter' && newFolderName.trim()) {
+                                    event.preventDefault();
+                                    submitNewFolder();
+                                }
+                                if (event.key === 'Escape') {
+                                    setIsAddingFolder(false);
+                                    setNewFolderName('');
+                                }
+                            }}
                         />
                         <div className="manager__folder-actions">
                             <button
