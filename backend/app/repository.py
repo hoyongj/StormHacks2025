@@ -197,7 +197,7 @@ def seed_ubc_plan() -> None:
         id="sample-ubc",
         title="University of British Columbia Day",
         summary="Discover UBC's vibrant Vancouver campus with ocean views, museums, and hidden study spots.",
-        created_at=datetime.utcnow(),
+        createdAt=datetime.utcnow(),
         stops=[
             PlanStop(
                 label="Main Mall",
