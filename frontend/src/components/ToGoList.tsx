@@ -4,7 +4,8 @@ import './ToGoList.css';
 
 type ToGoListProps = {
   plan: TravelPlan | null;
-  onCreateNew: () => void;
+  onCreateNew: () => void | Promise<void>;
+  isLoading?: boolean;
 };
 
 const TRIP_MOTIVATIONS = [
@@ -19,7 +20,7 @@ const TRIP_MOTIVATIONS = [
   'Relaxation',
 ];
 
-function ToGoList({ plan, onCreateNew }: ToGoListProps) {
+function ToGoList({ plan, onCreateNew, isLoading = false }: ToGoListProps) {
   const stops = plan?.stops ?? [];
   const [showModal, setShowModal] = useState(false);
   const [planName, setPlanName] = useState('');
@@ -56,14 +57,16 @@ function ToGoList({ plan, onCreateNew }: ToGoListProps) {
             <p className="to-go__eyebrow">To Go</p>
             <h3>{plan ? 'Upcoming stops' : 'Pick a plan to see your route'}</h3>
           </div>
-          <button type="button" className="info__create" onClick={handleOpenModal}>
+          <button type="button" className="info__create" onClick={handleOpenModal} disabled={isLoading}>
             Create New Plan
           </button>
         </div>
       </header>
 
       <ol className="to-go__list">
-        {stops.length ? (
+        {isLoading ? (
+          <li className="to-go__empty">Loading your stops…</li>
+        ) : stops.length ? (
           stops.map((stop, index) => (
             <li key={stop.label + index}>
               <span className="to-go__step">{index + 1}</span>
@@ -78,7 +81,7 @@ function ToGoList({ plan, onCreateNew }: ToGoListProps) {
         )}
       </ol>
 
-      {showModal && (
+      {!isLoading && showModal && (
         <div className="modal-overlay">
           <div className="modal">
             <div className="modal__title">
