@@ -512,7 +512,6 @@ function App() {
     );
   };
 
-<<<<<<< HEAD
   type InsertStopOptions = {
     index?: number;
     select?: boolean;
@@ -528,10 +527,7 @@ function App() {
       }
       planIdForUpdate = prev.id;
       const stops = [...prev.stops];
-      const targetIndex = Math.max(
-        0,
-        Math.min(options?.index ?? stops.length, stops.length)
-      );
+      const targetIndex = Math.max(0, Math.min(options?.index ?? stops.length, stops.length));
       insertedAt = targetIndex;
       stops.splice(targetIndex, 0, stop);
       setIsDraftDirty(true);
@@ -554,10 +550,11 @@ function App() {
         return current;
       });
       setRouteSegments([]);
-=======
+    }
+  };
+
   const handleAddTripAdvisorStop = async (suggestion: TripAdvisorSuggestion) => {
-    const planForEdit = draftPlan ?? selectedPlan;
-    if (!planForEdit) {
+    if (!draftPlan) {
       setError('Select a plan before adding new stops.');
       return;
     }
@@ -565,41 +562,30 @@ function App() {
     setIsAddingSuggestion(true);
     try {
       const resolved = await resolveTripAdvisorSuggestion(suggestion, advisorInfo);
+      const insertionIndex =
+        selectedStopRef && selectedStopRef.planId === draftPlan.id
+          ? selectedStopRef.index + 1
+          : undefined;
 
-      const basePlan = clonePlan(planForEdit);
+      insertStopIntoDraft(
+        {
+          label: resolved.label || suggestion.name,
+          description: resolved.description ?? suggestion.address ?? '',
+          placeId: resolved.placeId,
+          latitude: resolved.latitude,
+          longitude: resolved.longitude,
+        },
+        { index: insertionIndex, select: true },
+      );
 
-      const stops = [...basePlan.stops];
-      const insertionIndex = (() => {
-        if (selectedStopIndex === null || selectedStopIndex < 0) {
-          return stops.length;
-        }
-        return Math.min(stops.length, Math.max(0, selectedStopIndex + 1));
-      })();
-
-      const newStop: PlanStop = {
-        label: resolved.label || suggestion.name,
-        description: resolved.description ?? suggestion.address ?? '',
-        placeId: resolved.placeId,
-        latitude: resolved.latitude,
-        longitude: resolved.longitude,
-      };
-
-      stops.splice(insertionIndex, 0, newStop);
-      const nextPlan = { ...basePlan, stops };
-
-      setDraftPlan(nextPlan);
-      setIsDraftDirty(true);
-      setRouteSegments([]);
       setError(null);
       setAdvisorInfo(null);
       setAdvisorError(null);
-      setSelectedStopRef({ planId: nextPlan.id, index: insertionIndex });
     } catch (err) {
       console.error('Failed to add suggestion to plan', err);
       setError('Unable to add that suggestion to your plan. Please try again.');
     } finally {
       setIsAddingSuggestion(false);
->>>>>>> polyline
     }
   };
 
@@ -617,26 +603,6 @@ function App() {
       return { ...prev, stops: [...prev.stops, newStop] };
     });
     setRouteSegments([]);
-  };
-
-  const handleAddSuggestionStop = (suggestion: TripAdvisorSuggestion) => {
-    const planId = draftPlan?.id ?? null;
-    if (!planId) {
-      return;
-    }
-
-    const insertionIndex =
-      selectedStopRef && selectedStopRef.planId === planId
-        ? selectedStopRef.index + 1
-        : undefined;
-
-    insertStopIntoDraft(
-      {
-        label: suggestion.name,
-        description: suggestion.address ?? '',
-      },
-      { index: insertionIndex, select: true }
-    );
   };
 
   const handleAssistantAddStop = (stop: PlanStop, options?: InsertStopOptions) => {
@@ -1208,14 +1174,9 @@ function App() {
               info={advisorInfo}
               isLoading={advisorLoading}
               error={advisorError}
-<<<<<<< HEAD
               stops={draftPlan?.stops ?? selectedPlan?.stops ?? []}
-              onAddSuggestion={draftPlan ? handleAddSuggestionStop : undefined}
-=======
-              stops={selectedPlan?.stops ?? []}
-              onAddSuggestion={handleAddTripAdvisorStop}
-              isAddingSuggestion={isAddingSuggestion}
->>>>>>> polyline
+              onAddSuggestion={draftPlan ? handleAddTripAdvisorStop : undefined}
+              isAddingSuggestion={draftPlan ? isAddingSuggestion : false}
             />
           </section>
 
