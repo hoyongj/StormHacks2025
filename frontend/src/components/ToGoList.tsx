@@ -5,12 +5,8 @@ import './ToGoList.css';
 type ToGoListProps = {
   plan: TravelPlan | null;
   onCreateNew: () => void;
-  isLoading: boolean;
 };
 
-<<<<<<< HEAD
-function ToGoList({ plan, onCreateNew, isLoading }: ToGoListProps) {
-=======
 const TRIP_MOTIVATIONS = [
   'Food',
   'Museums',
@@ -24,7 +20,6 @@ const TRIP_MOTIVATIONS = [
 ];
 
 function ToGoList({ plan, onCreateNew }: ToGoListProps) {
->>>>>>> frame
   const stops = plan?.stops ?? [];
   const [showModal, setShowModal] = useState(false);
   const [planName, setPlanName] = useState('');
@@ -61,21 +56,14 @@ function ToGoList({ plan, onCreateNew }: ToGoListProps) {
             <p className="to-go__eyebrow">To Go</p>
             <h3>{plan ? 'Upcoming stops' : 'Pick a plan to see your route'}</h3>
           </div>
-<<<<<<< HEAD
-          <button type="button" className="info__create" onClick={onCreateNew} disabled={isLoading}>
-            Generate Plan
-=======
           <button type="button" className="info__create" onClick={handleOpenModal}>
             Create New Plan
->>>>>>> frame
           </button>
         </div>
       </header>
 
       <ol className="to-go__list">
-        {isLoading ? (
-          <li className="to-go__empty">Loading your stops…</li>
-        ) : stops.length ? (
+        {stops.length ? (
           stops.map((stop, index) => (
             <li key={stop.label + index}>
               <span className="to-go__step">{index + 1}</span>
