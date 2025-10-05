@@ -9,7 +9,6 @@ type MapViewProps = {
 
 const DEFAULT_CENTER: google.maps.LatLngLiteral = { lat: 49.2796, lng: -122.9199 }; // Burnaby, BC
 const EMBEDDED_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-console.log('[MapView] Embedded key present:', Boolean(EMBEDDED_MAPS_KEY));
 
 function MapView({ plan }: MapViewProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -32,31 +31,24 @@ function MapView({ plan }: MapViewProps) {
     async function fetchMapsKey() {
       const baseUrl = window.location.origin;
       const endpoint = `${baseUrl}/api/config/maps-key`;
-      console.log('[MapView] Fetching key from backend at', endpoint);
-      console.log('[MapView] Requesting key from backend…');
       setIsLoadingKey(true);
 
       try {
         const response = await fetch(endpoint);
-        console.log('[MapView] Backend response status:', response.status);
         if (!response.ok) {
           throw new Error('Key not configured');
         }
         const payload: { googleMapsApiKey?: string } = await response.json();
-        console.log('[MapView] Backend payload received:', Object.keys(payload));
         if (cancelled) {
           return;
         }
         if (payload.googleMapsApiKey) {
           setMapsKey(payload.googleMapsApiKey);
-          console.log('[MapView] Loaded key prefix:', payload.googleMapsApiKey.slice(0, 8));
           setMapError(null);
         } else {
-          console.log('[MapView] Payload missing googleMapsApiKey property');
           setMapError('Google Maps API key is not configured.');
         }
       } catch (error) {
-        console.error('[MapView] Failed to load key from backend', error);
         if (!cancelled) {
           setMapError('Live map is unavailable because the Google Maps API key is not configured.');
         }
@@ -76,10 +68,8 @@ function MapView({ plan }: MapViewProps) {
 
   const loader = useMemo(() => {
     if (!mapsKey) {
-      console.log('[MapView] Maps loader waiting for key. Error?', mapError);
       return null;
     }
-    console.log('[MapView] Creating Google Maps loader with key prefix:', mapsKey.slice(0, 8));
     return new Loader({ apiKey: mapsKey, version: 'weekly', libraries: ['places'] });
   }, [mapsKey]);
 

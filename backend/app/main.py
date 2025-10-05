@@ -3,8 +3,6 @@ from __future__ import annotations
 import asyncio
 from typing import Dict
 
-import logging
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -24,8 +22,6 @@ app.add_middleware(
 )
 
 gemini_client = GeminiClient()
-logger = logging.getLogger(__name__)
-
 maps_client = MapsClient(get_google_maps_api_key())
 _plan_store: Dict[str, TravelPlan] = {}
 
@@ -61,10 +57,7 @@ async def get_route(plan_id: str) -> MapRoute:
 def get_maps_key() -> dict[str, str]:
     api_key = maps_client.api_key
     if not api_key:
-        logger.warning("/api/config/maps-key requested but key is missing")
         raise HTTPException(status_code=404, detail="Google Maps API key is not configured")
-    logger.info("/api/config/maps-key served key prefix: %s", api_key[:8])
-    print(api_key)
     return {"googleMapsApiKey": api_key}
 
 
