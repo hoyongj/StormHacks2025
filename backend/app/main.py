@@ -7,9 +7,19 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .dependencies import get_google_maps_api_key
 from .repository import get_plan, init_db, list_plans as fetch_travel_plans, save_plan
-from .schemas import ChatRequest, ChatResponse, MapRoute, PromptRequest, SuggestionOptions, TravelPlan
+from .schemas import (
+    ChatRequest,
+    ChatResponse,
+    MapRoute,
+    PromptRequest,
+    SuggestionOptions,
+    TravelPlan,
+    TripAdvisorRequest,
+    TripAdvisorResponse,
+)
 from .services.gemini import GeminiClient
 from .services.maps import MapsClient
+from .services.tripadvisor import TripAdvisorService
 
 app = FastAPI(title="Pathfinder API", version="0.1.0")
 
@@ -23,6 +33,7 @@ app.add_middleware(
 
 gemini_client = GeminiClient()
 maps_client = MapsClient(get_google_maps_api_key())
+tripadvisor_service = TripAdvisorService()
 
 init_db()
 
@@ -66,6 +77,14 @@ def get_maps_key() -> dict[str, str]:
     if not api_key:
         raise HTTPException(status_code=404, detail="Google Maps API key is not configured")
     return {"googleMapsApiKey": api_key}
+
+
+@app.post("/api/tripadvisor", response_model=TripAdvisorResponse)
+async def describe_place(request: TripAdvisorRequest) -> TripAdvisorResponse:
+    info = tripadvisor_service.describe_location(request)
+    if request.user_id:
+        tripadvisor_service.persist_last_viewed(request.user_id, info)
+    return TripAdvisorResponse(info=info)
 
 
 # Provide compatibility for uvicorn --factory

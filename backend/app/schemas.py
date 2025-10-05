@@ -203,8 +203,15 @@ class ChatResponse(BaseModel):
 
 
 class TripAdvisorRequest(BaseModel):
-    latitude: float
-    longitude: float
+    name: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
+    address: Optional[str] = None
+    place_id: Optional[str] = None
+    description: Optional[str] = None
+    user_id: Optional[str] = None
 
 
 class TripAdvisorResponse(BaseModel):
@@ -271,8 +278,8 @@ class MapInteractionInterface:
 class TripAdvisorInterface:
     """Surfaces nearby recommendations using Gemini for narrative context."""
 
-    def describe_location(self, place_info: PlaceInfo) -> str:
-        """Generate a user-friendly summary for the location chosen on the map."""
+    def describe_location(self, request: TripAdvisorRequest) -> PlaceInfo:
+        """Build an enriched :class:`PlaceInfo` payload for the selected location."""
 
         raise NotImplementedError
 

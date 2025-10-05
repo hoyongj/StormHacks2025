@@ -6,6 +6,8 @@ type ToGoListProps = {
   plan: TravelPlan | null;
   onCreateNew: () => void | Promise<void>;
   isLoading?: boolean;
+  onSelectStop?: (stop: TravelPlan['stops'][number]) => void;
+  selectedStopLabel?: string;
 };
 
 const TRIP_MOTIVATIONS = [
@@ -20,7 +22,7 @@ const TRIP_MOTIVATIONS = [
   'Relaxation',
 ];
 
-function ToGoList({ plan, onCreateNew, isLoading = false }: ToGoListProps) {
+function ToGoList({ plan, onCreateNew, isLoading = false, onSelectStop, selectedStopLabel }: ToGoListProps) {
   const stops = plan?.stops ?? [];
   const [showModal, setShowModal] = useState(false);
   const [planName, setPlanName] = useState('');
@@ -67,15 +69,20 @@ function ToGoList({ plan, onCreateNew, isLoading = false }: ToGoListProps) {
         {isLoading ? (
           <li className="to-go__empty">Loading your stops…</li>
         ) : stops.length ? (
-          stops.map((stop, index) => (
-            <li key={stop.label + index}>
-              <span className="to-go__step">{index + 1}</span>
-              <div>
-                <span className="to-go__title">{stop.label}</span>
-                {stop.description ? <span className="to-go__desc">{stop.description}</span> : null}
-              </div>
-            </li>
-          ))
+          stops.map((stop, index) => {
+            const isSelected = selectedStopLabel === stop.label;
+            return (
+              <li key={stop.label + index} className={isSelected ? 'to-go__item to-go__item--selected' : 'to-go__item'}>
+                <button type="button" onClick={() => onSelectStop?.(stop)}>
+                  <span className="to-go__step">{index + 1}</span>
+                  <div>
+                    <span className="to-go__title">{stop.label}</span>
+                    {stop.description ? <span className="to-go__desc">{stop.description}</span> : null}
+                  </div>
+                </button>
+              </li>
+            );
+          })
         ) : (
           <li className="to-go__empty">Add stops to start crafting your day.</li>
         )}
