@@ -403,6 +403,48 @@ function App() {
     setRouteSegments([]);
   };
 
+  const handleAddSuggestionStop = (suggestion: TripAdvisorSuggestion) => {
+    let insertedAt: number | null = null;
+    let planIdForUpdate: string | null = null;
+
+    setDraftPlan((prev) => {
+      if (!prev) {
+        return prev;
+      }
+      planIdForUpdate = prev.id;
+      const insertionIndex =
+        selectedStopRef && selectedStopRef.planId === prev.id
+          ? selectedStopRef.index + 1
+          : prev.stops.length;
+
+      insertedAt = insertionIndex;
+      const stops = [...prev.stops];
+      const newStop: PlanStop = {
+        label: suggestion.name,
+        description: suggestion.address ?? '',
+      };
+      stops.splice(insertionIndex, 0, newStop);
+      setIsDraftDirty(true);
+      return { ...prev, stops };
+    });
+
+    if (planIdForUpdate !== null && insertedAt !== null) {
+      const planId = planIdForUpdate;
+      const insertionIndex = insertedAt;
+
+      setSelectedStopRef((current) => {
+        if (!current || current.planId !== planId) {
+          return current;
+        }
+        if (current.index >= insertionIndex) {
+          return { planId, index: current.index + 1 };
+        }
+        return current;
+      });
+      setRouteSegments([]);
+    }
+  };
+
   const handleDraftUpdateStop = (stopIndex: number, updates: Partial<PlanStop>) => {
     setDraftPlan((prev) => {
       if (!prev) {
@@ -893,7 +935,8 @@ function App() {
               info={advisorInfo}
               isLoading={advisorLoading}
               error={advisorError}
-              stops={selectedPlan?.stops ?? []}
+              stops={draftPlan?.stops ?? selectedPlan?.stops ?? []}
+              onAddSuggestion={draftPlan ? handleAddSuggestionStop : undefined}
             />
           </section>
 

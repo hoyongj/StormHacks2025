@@ -1,3 +1,4 @@
+import type { KeyboardEvent } from 'react';
 import type { PlanStop, TripAdvisorInfo, TripAdvisorSuggestion } from '../App';
 import './TripAdvisor.css';
 
@@ -7,6 +8,7 @@ type TripAdvisorProps = {
   stops: PlanStop[];
   isLoading: boolean;
   error: string | null;
+  onAddSuggestion?: (suggestion: TripAdvisorSuggestion) => void;
 };
 
 const HINT_LOOKUP: Record<'eat' | 'see' | 'stay', string> = {
@@ -15,7 +17,7 @@ const HINT_LOOKUP: Record<'eat' | 'see' | 'stay', string> = {
   stay: 'Consider booking early—demand is high in peak season.',
 };
 
-function TripAdvisor({ selectedStop, info, stops, isLoading, error }: TripAdvisorProps) {
+function TripAdvisor({ selectedStop, info, stops, isLoading, error, onAddSuggestion }: TripAdvisorProps) {
   const sections: { title: string; items: TripAdvisorSuggestion[]; intent: 'eat' | 'see' | 'stay' }[] = info
     ? [
         { title: 'Nearby Restaurants', items: info.nearbyRestaurants, intent: 'eat' },
@@ -48,7 +50,12 @@ function TripAdvisor({ selectedStop, info, stops, isLoading, error }: TripAdviso
                 <ul>
                   {section.items.length ? (
                     section.items.map((item) => (
-                      <LineItem key={`${section.title}-${item.name}`} suggestion={item} intent={section.intent} />
+                      <LineItem
+                        key={`${section.title}-${item.name}`}
+                        suggestion={item}
+                        intent={section.intent}
+                        onAdd={onAddSuggestion}
+                      />
                     ))
                   ) : (
                     <li className="advisor__empty-item">Nothing nearby detected yet.</li>
@@ -79,16 +86,35 @@ export default TripAdvisor;
 type LineItemProps = {
   suggestion: TripAdvisorSuggestion;
   intent: 'eat' | 'see' | 'stay';
+  onAdd?: (suggestion: TripAdvisorSuggestion) => void;
 };
 
-function LineItem({ suggestion, intent }: LineItemProps) {
+function LineItem({ suggestion, intent, onAdd }: LineItemProps) {
   const rating = suggestion.rating ? `${suggestion.rating.toFixed(1)}★` : 'No rating yet';
   const total = suggestion.totalRatings ? `(${suggestion.totalRatings.toLocaleString()} reviews)` : '';
   const price = typeof suggestion.priceLevel === 'number' ? '$'.repeat(Math.max(0, Math.min(4, suggestion.priceLevel + 1))) : undefined;
   const status = suggestion.openNow === true ? 'Open now' : suggestion.openNow === false ? 'Currently closed' : undefined;
 
+  const handleActivate = () => {
+    onAdd?.(suggestion);
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLLIElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onAdd?.(suggestion);
+    }
+  };
+
   return (
-    <li className="advisor__item" tabIndex={0} aria-label={`${suggestion.name}. ${HINT_LOOKUP[intent]}`}>
+    <li
+      className="advisor__item"
+      tabIndex={0}
+      role={onAdd ? 'button' : undefined}
+      aria-label={`${suggestion.name}. ${HINT_LOOKUP[intent]}`}
+      onClick={onAdd ? handleActivate : undefined}
+      onKeyDown={onAdd ? handleKeyDown : undefined}
+    >
       <span className="advisor__item-name">{suggestion.name}</span>
       <div className="advisor__tooltip" role="note">
         <strong>{suggestion.name}</strong>
