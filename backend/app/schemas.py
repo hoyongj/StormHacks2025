@@ -83,6 +83,9 @@ class PlaceSuggestion(BaseModel):
     price_level: Optional[int] = Field(default=None, ge=0, le=4)
     open_now: Optional[bool] = None
     types: List[str] = Field(default_factory=list)
+    place_id: Optional[str] = None
+    latitude: Optional[float] = Field(default=None, ge=-90.0, le=90.0)
+    longitude: Optional[float] = Field(default=None, ge=-180.0, le=180.0)
 
 
 class PlaceInfo(Place):

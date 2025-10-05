@@ -59,6 +59,9 @@ export type TripAdvisorSuggestion = {
   priceLevel?: number;
   openNow?: boolean;
   types: string[];
+  placeId?: string;
+  latitude?: number;
+  longitude?: number;
 };
 
 export type TripAdvisorInfo = {
@@ -140,6 +143,9 @@ type TripAdvisorSuggestionPayload = {
   price_level?: number;
   open_now?: boolean;
   types?: string[];
+  place_id?: string;
+  latitude?: number;
+  longitude?: number;
 };
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api';
@@ -463,6 +469,9 @@ function App() {
       {
         label: suggestion.name,
         description: suggestion.address ?? '',
+        placeId: suggestion.placeId,
+        latitude: suggestion.latitude,
+        longitude: suggestion.longitude,
       },
       { index: insertionIndex, select: true }
     );
@@ -1140,6 +1149,9 @@ function normalizeSuggestion(suggestion: TripAdvisorSuggestionPayload): TripAdvi
     priceLevel: suggestion.price_level,
     openNow: suggestion.open_now,
     types: suggestion.types ?? [],
+    placeId: suggestion.place_id,
+    latitude: suggestion.latitude,
+    longitude: suggestion.longitude,
   };
 }
 

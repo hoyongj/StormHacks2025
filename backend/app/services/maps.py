@@ -4,13 +4,14 @@ import hashlib
 import html
 import os
 import re
-from typing import Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Tuple
 
 import httpx
 
 from ..schemas import PlanStop, RouteSegment
 
 DIRECTIONS_URL = "https://maps.googleapis.com/maps/api/directions/json"
+GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json"
 
 
 class MapsClient:
@@ -26,6 +27,7 @@ class MapsClient:
         )
         self._last_warnings: List[str] = []
         self._last_payload: Optional[dict] = None
+        self._geocode_cache: Dict[str, Tuple[float, float]] = {}
 
     async def build_route_polyline(self, stops: List[PlanStop]) -> str:
         """Return an encoded polyline for the ordered stops."""
@@ -33,19 +35,21 @@ class MapsClient:
         self._last_warnings = []
         self._last_payload = None
 
-        payload = await self._request_directions(stops)
+        enriched_stops = await self._ensure_coordinates(stops)
+
+        payload = await self._request_directions(enriched_stops)
         if not payload:
-            return self._fallback_polyline(stops)
+            return self._fallback_polyline(enriched_stops)
 
         routes = payload.get("routes") or []
         if not routes:
-            return self._fallback_polyline(stops)
+            return self._fallback_polyline(enriched_stops)
 
         route = routes[0]
         overview = route.get("overview_polyline") or {}
         points = overview.get("points")
         if not points:
-            return self._fallback_polyline(stops)
+            return self._fallback_polyline(enriched_stops)
 
         warnings = route.get("warnings") or []
         self._last_warnings = [str(item) for item in warnings if item]
@@ -85,6 +89,39 @@ class MapsClient:
             )
         return segments
 
+    async def _ensure_coordinates(self, stops: List[PlanStop]) -> List[PlanStop]:
+        if not self.api_key:
+            return list(stops)
+
+        enriched: List[PlanStop] = []
+        for stop in stops:
+            if stop.latitude is not None and stop.longitude is not None:
+                enriched.append(stop)
+                continue
+
+            cache_key = self._geocode_cache_key(stop)
+            coordinates = self._geocode_cache.get(cache_key) if cache_key else None
+            if coordinates is None:
+                coordinates = await self._geocode_stop(stop)
+                if coordinates is not None and cache_key:
+                    self._geocode_cache[cache_key] = coordinates
+
+            if coordinates is None:
+                enriched.append(stop)
+                continue
+
+            enriched.append(
+                PlanStop(
+                    label=stop.label,
+                    description=stop.description,
+                    place_id=stop.place_id,
+                    latitude=coordinates[0],
+                    longitude=coordinates[1],
+                )
+            )
+
+        return enriched
+
     async def _request_directions(self, stops: List[PlanStop]) -> Optional[dict]:
         if not self.api_key or len(stops) < 2:
             return None
@@ -116,6 +153,45 @@ class MapsClient:
 
         self._last_payload = payload
         return payload
+
+    async def _geocode_stop(self, stop: PlanStop) -> Optional[Tuple[float, float]]:
+        if not self.api_key:
+            return None
+
+        params: dict[str, str] = {"key": self.api_key}
+        if stop.place_id:
+            params["place_id"] = stop.place_id
+        else:
+            address = stop.description or stop.label
+            if not address:
+                return None
+            params["address"] = address
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(GEOCODE_URL, params=params)
+            response.raise_for_status()
+            payload = response.json()
+        except Exception:
+            return None
+
+        if payload.get("status") != "OK":
+            return None
+
+        results = payload.get("results") or []
+        if not results:
+            return None
+
+        location = results[0].get("geometry", {}).get("location") or {}
+        lat = location.get("lat")
+        lng = location.get("lng")
+        if isinstance(lat, (int, float)) and isinstance(lng, (int, float)):
+            return float(lat), float(lng)
+        return None
+
+    def _geocode_cache_key(self, stop: PlanStop) -> str:
+        token = stop.place_id or stop.description or stop.label
+        return token or ""
 
     def _format_waypoint(self, stop: PlanStop) -> str:
         if stop.place_id:

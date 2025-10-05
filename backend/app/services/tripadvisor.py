@@ -49,9 +49,12 @@ class TripAdvisorService(TripAdvisorInterface):
                 summary=details.get("summary")
                 or request.description
                 or f"Discover {request.name} and explore the surrounding neighbourhood.",
-                nearby_restaurants=restaurants or self._fallback_category("Restaurant", request.name),
-                nearby_hotels=hotels or self._fallback_category("Hotel", request.name),
-                nearby_attractions=attractions or self._fallback_category("Activity", request.name),
+                nearby_restaurants=restaurants
+                or self._fallback_category("Restaurant", request.name, coord_lat, coord_lng),
+                nearby_hotels=hotels
+                or self._fallback_category("Hotel", request.name, coord_lat, coord_lng),
+                nearby_attractions=attractions
+                or self._fallback_category("Activity", request.name, coord_lat, coord_lng),
                 tags=[],
                 primary_category="Landmark",
                 source="tripadvisor",
@@ -154,6 +157,7 @@ class TripAdvisorService(TripAdvisorInterface):
                 name = item.get("name")
                 if not name:
                     continue
+                geometry = item.get("geometry", {}).get("location", {})
                 suggestion = PlaceSuggestion(
                     name=name,
                     rating=item.get("rating"),
@@ -164,6 +168,9 @@ class TripAdvisorService(TripAdvisorInterface):
                     if isinstance(item.get("opening_hours"), dict)
                     else None,
                     types=[t for t in item.get("types", []) if isinstance(t, str)],
+                    place_id=item.get("place_id"),
+                    latitude=geometry.get("lat"),
+                    longitude=geometry.get("lng"),
                 )
                 suggestions.append(suggestion)
                 if len(suggestions) >= 3:
@@ -197,19 +204,33 @@ class TripAdvisorService(TripAdvisorInterface):
             address=request.address,
             coordinates=Coordinates(latitude=latitude, longitude=longitude),
             summary=request.description or f"Explore {request.name} and nearby neighbourhood gems.",
-            nearby_restaurants=self._fallback_category("Restaurant", request.name),
-            nearby_hotels=self._fallback_category("Hotel", request.name),
-            nearby_attractions=self._fallback_category("Activity", request.name),
+            nearby_restaurants=self._fallback_category(
+                "Restaurant", request.name, latitude, longitude
+            ),
+            nearby_hotels=self._fallback_category("Hotel", request.name, latitude, longitude),
+            nearby_attractions=self._fallback_category(
+                "Activity", request.name, latitude, longitude
+            ),
             tags=[],
             primary_category="Landmark",
             source="tripadvisor",
         )
 
-    def _fallback_category(self, category: str, context: str) -> List[PlaceSuggestion]:
+    def _fallback_category(
+        self,
+        category: str,
+        context: str,
+        base_latitude: Optional[float],
+        base_longitude: Optional[float],
+    ) -> List[PlaceSuggestion]:
         random.seed(f"{category}-{context}")
         suggestions: List[PlaceSuggestion] = []
         resolved_context = context or "This stop"
+        lat = base_latitude if base_latitude is not None else 49.25
+        lng = base_longitude if base_longitude is not None else -123.1
         for idx in range(3):
+            offset_lat = lat + random.uniform(-0.01, 0.01)
+            offset_lng = lng + random.uniform(-0.01, 0.01)
             suggestions.append(
                 PlaceSuggestion(
                     name=f"{resolved_context} {category} {idx + 1}",
@@ -219,6 +240,8 @@ class TripAdvisorService(TripAdvisorInterface):
                     price_level=random.randint(1, 3),
                     open_now=random.choice([True, False]),
                     types=[category.lower()],
+                    latitude=offset_lat,
+                    longitude=offset_lng,
                 )
             )
         return suggestions
