@@ -155,12 +155,19 @@ function App() {
   const [routeSegments, setRouteSegments] = useState<RouteSegment[]>([]);
   const [view, setView] = useState<'planner' | 'manager' | 'admin'>('planner');
   const [folders, setFolders] = useState<Folder[]>([{ id: 'all', name: 'All Plans', planIds: [] }]);
+  const [libraryFolderId, setLibraryFolderId] = useState('all');
   const [profile, setProfile] = useState<UserProfile>({
     name: 'Jamie Hoang',
     email: 'jamie.hoang@example.com',
     homeCity: 'Vancouver, BC',
     bio: 'Train-hopping foodie who loves scenic detours.'
   });
+
+  useEffect(() => {
+    if (!folders.some((folder) => folder.id === libraryFolderId)) {
+      setLibraryFolderId('all');
+    }
+  }, [folders, libraryFolderId]);
 
   const [draftPlan, setDraftPlan] = useState<TravelPlan | null>(null);
   const [isDraftDirty, setIsDraftDirty] = useState(false);
@@ -545,13 +552,19 @@ function App() {
       return null;
     }
     const id = `folder-${createClientGeneratedId()}`;
+    let created = false;
     setFolders((prev) => {
       if (prev.some((folder) => folder.name.toLowerCase() === trimmed.toLowerCase())) {
         return prev;
       }
+      created = true;
       return [...prev, { id, name: trimmed, planIds: [] }];
     });
-    return id;
+    if (created) {
+      setLibraryFolderId(id);
+      return id;
+    }
+    return null;
   };
 
   const handleAssignPlanToFolder = (folderId: string, planId: string) => {
@@ -601,6 +614,13 @@ function App() {
       }
       return updated;
     });
+    setFolders((prev) =>
+      prev.map((folder) =>
+        folder.id === 'all'
+          ? folder
+          : { ...folder, planIds: folder.planIds.filter((id) => id !== planId) },
+      ),
+    );
   };
 
   const handleModalSave = async () => {
@@ -833,6 +853,9 @@ function App() {
             <InfoPanel
               plan={selectedPlan}
               plans={plans}
+              folders={folders}
+              selectedFolderId={libraryFolderId}
+              onSelectFolder={setLibraryFolderId}
               selectedPlanId={selectedPlanId}
               onSelectPlan={setSelectedPlanId}
               onUpdatePlanTitle={handlePlanTitleChange}

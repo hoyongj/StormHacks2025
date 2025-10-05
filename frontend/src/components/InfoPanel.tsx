@@ -1,4 +1,5 @@
-import { TravelPlan, RouteSegment } from '../App';
+import { useMemo } from 'react';
+import { TravelPlan, RouteSegment, Folder } from '../App';
 import './InfoPanel.css';
 
 type InfoPanelProps = {
@@ -10,11 +11,17 @@ type InfoPanelProps = {
   onUpdatePlanSummary: (planId: string, summary: string) => void;
   onDeletePlan: (planId: string) => void;
   routeSegments: RouteSegment[];
+  folders: Folder[];
+  selectedFolderId: string;
+  onSelectFolder: (folderId: string) => void;
 };
 
 function InfoPanel({
   plan,
   plans,
+  folders,
+  selectedFolderId,
+  onSelectFolder,
   selectedPlanId,
   onSelectPlan,
   onUpdatePlanTitle,
@@ -34,6 +41,37 @@ function InfoPanel({
         }
     };
 
+  const folderMap = useMemo(() => {
+    const mapping = new Map<string, Folder[]>();
+    folders.forEach((folder) => {
+      if (folder.id === 'all') {
+        return;
+      }
+      folder.planIds.forEach((planId) => {
+        if (!mapping.has(planId)) {
+          mapping.set(planId, []);
+        }
+        mapping.get(planId)!.push(folder);
+      });
+    });
+    return mapping;
+  }, [folders]);
+
+  const activeFolder = useMemo(() => {
+    return (
+      folders.find((folder) => folder.id === selectedFolderId) ??
+      folders[0] ?? { id: 'all', name: 'All Plans', planIds: [] }
+    );
+  }, [folders, selectedFolderId]);
+
+  const displayedPlans = useMemo(() => {
+    if (selectedFolderId === 'all' || activeFolder.id === 'all') {
+      return plans;
+    }
+    return plans.filter((plan) => activeFolder.planIds.includes(plan.id));
+  }, [plans, activeFolder, selectedFolderId]);
+
+  const folderLabel = activeFolder.name;
   return (
     <div className="info">
       <header className="info__header">
@@ -140,40 +178,77 @@ function InfoPanel({
 
       <section className="info__section info__section--history">
         <div className="info__history-header">
-          <h3>Plan Library</h3>
-          <span className="info__history-hint">Tap to switch, remove plans you no longer need.</span>
+          <div>
+            <h3>Plan Library</h3>
+            <span className="info__history-hint">Browse plans by folder or quick access.</span>
+          </div>
+          <label className="info__folder-filter">
+            <span>Folder</span>
+            <select
+              className="info__folder-select"
+              value={selectedFolderId}
+              onChange={(event) => onSelectFolder(event.target.value)}
+            >
+              <option value="all">All plans</option>
+              {folders
+                .filter((folder) => folder.id !== 'all')
+                .map((folder) => (
+                  <option key={folder.id} value={folder.id}>
+                    {folder.name}
+                  </option>
+                ))}
+            </select>
+          </label>
         </div>
-        <ul className="info__plans">
-          {plans.length ? (
-            plans.map((item) => (
-              <li key={item.id} className="info__plan-row">
-                <button
-                  type="button"
-                  className={
-                    item.id === selectedPlanId ? 'info__plan info__plan--active' : 'info__plan'
-                  }
-                  onClick={() => onSelectPlan(item.id)}
-                >
-                  <span className="info__plan-title">{item.title || 'Untitled Plan'}</span>
-                  <span className="info__plan-meta">
-                    {new Date(item.createdAt).toLocaleDateString()}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  className="info__plan-remove"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onDeletePlan(item.id);
-                  }}
-                  aria-label={`Remove ${item.title || 'untitled plan'}`}
-                >
-                  ✕
-                </button>
-              </li>
-            ))
+        <ul className="info__plans info__plans--scroll">
+          {displayedPlans.length ? (
+            displayedPlans.map((item) => {
+              const associatedFolders = folderMap.get(item.id) ?? [];
+              return (
+                <li key={item.id} className="info__plan-row">
+                  <button
+                    type="button"
+                    className={
+                      item.id === selectedPlanId ? 'info__plan info__plan--active' : 'info__plan'
+                    }
+                    onClick={() => onSelectPlan(item.id)}
+                  >
+                    <span className="info__plan-title">{item.title || 'Untitled Plan'}</span>
+                    <span className="info__plan-meta">
+                      {new Date(item.createdAt).toLocaleDateString()}
+                    </span>
+                    <div className="info__plan-tags">
+                      {associatedFolders.length ? (
+                        associatedFolders.map((folder) => (
+                          <span key={folder.id} className="info__plan-tag">
+                            {folder.name}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="info__plan-tag info__plan-tag--empty">Unassigned</span>
+                      )}
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    className="info__plan-remove"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onDeletePlan(item.id);
+                    }}
+                    aria-label={`Remove ${item.title || 'untitled plan'}`}
+                  >
+                    ✕
+                  </button>
+                </li>
+              );
+            })
           ) : (
-            <li className="info__empty">No saved plans yet.</li>
+            <li className="info__empty">
+              {selectedFolderId === 'all'
+                ? 'No saved plans yet.'
+                : `"${folderLabel}" has no plans yet.`}
+            </li>
           )}
         </ul>
       </section>
