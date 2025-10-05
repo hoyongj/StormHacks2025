@@ -170,13 +170,16 @@
 }
 
 .app__to-go {
-    min-height: 0;
-    display: flex;
-    align-self: stretch;
+  min-height: 0;
+  display: flex;
+  align-self: stretch;
+  width: 300px;
+  max-width: 100%;
+  justify-self: end;
 }
 
 .app__to-go > .to-go {
-    flex: 1;
+  width: 100%;
 }
 
 .app__assistant {
