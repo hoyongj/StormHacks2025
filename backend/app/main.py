@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .dependencies import get_google_maps_api_key
 from .repository import get_plan, init_db, list_plans as fetch_travel_plans, save_plan
-from .schemas import MapRoute, PromptRequest, SuggestionOptions, TravelPlan
+from .schemas import ChatRequest, ChatResponse, MapRoute, PromptRequest, SuggestionOptions, TravelPlan
 from .services.gemini import GeminiClient
 from .services.maps import MapsClient
 
@@ -37,6 +37,12 @@ async def generate_plan(request: PromptRequest) -> TravelPlan:
     plan = await gemini_client.suggest_plan(request.prompt)
     save_plan(plan)
     return plan
+
+
+@app.post("/api/assistant/chat", response_model=ChatResponse)
+async def assistant_chat(request: ChatRequest) -> ChatResponse:
+    reply = await gemini_client.chat_reply(request.message, request.context or [])
+    return ChatResponse(reply=reply)
 
 
 @app.get("/api/plans", response_model=SuggestionOptions)
