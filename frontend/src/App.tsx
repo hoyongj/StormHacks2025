@@ -523,49 +523,34 @@ function App() {
     try {
       const resolved = await resolveTripAdvisorSuggestion(suggestion, advisorInfo);
 
-      let nextSelection: { planId: string; index: number } | null = null;
-      let updated = false;
+      const basePlan = clonePlan(planForEdit);
 
-      setDraftPlan((prev) => {
-        const basePlan = prev ?? clonePlan(planForEdit);
-        if (!basePlan) {
-          return prev;
+      const stops = [...basePlan.stops];
+      const insertionIndex = (() => {
+        if (selectedStopIndex === null || selectedStopIndex < 0) {
+          return stops.length;
         }
+        return Math.min(stops.length, Math.max(0, selectedStopIndex + 1));
+      })();
 
-        const stops = [...basePlan.stops];
-        const insertionIndex = (() => {
-          if (selectedStopIndex === null || selectedStopIndex < 0) {
-            return stops.length;
-          }
-          return Math.min(stops.length, Math.max(0, selectedStopIndex + 1));
-        })();
+      const newStop: PlanStop = {
+        label: resolved.label || suggestion.name,
+        description: resolved.description ?? suggestion.address ?? '',
+        placeId: resolved.placeId,
+        latitude: resolved.latitude,
+        longitude: resolved.longitude,
+      };
 
-        const newStop: PlanStop = {
-          label: resolved.label || suggestion.name,
-          description: resolved.description ?? suggestion.address ?? '',
-          placeId: resolved.placeId,
-          latitude: resolved.latitude,
-          longitude: resolved.longitude,
-        };
+      stops.splice(insertionIndex, 0, newStop);
+      const nextPlan = { ...basePlan, stops };
 
-        stops.splice(insertionIndex, 0, newStop);
-        nextSelection = { planId: basePlan.id, index: insertionIndex };
-        updated = true;
-        setIsDraftDirty(true);
-        return { ...basePlan, stops };
-      });
-
-      if (updated) {
-        setRouteSegments([]);
-        setError(null);
-        setAdvisorInfo(null);
-        setAdvisorError(null);
-        if (nextSelection) {
-          setSelectedStopRef(nextSelection);
-        }
-      } else {
-        setError('Unable to add that suggestion to your plan. Please try again.');
-      }
+      setDraftPlan(nextPlan);
+      setIsDraftDirty(true);
+      setRouteSegments([]);
+      setError(null);
+      setAdvisorInfo(null);
+      setAdvisorError(null);
+      setSelectedStopRef({ planId: nextPlan.id, index: insertionIndex });
     } catch (err) {
       console.error('Failed to add suggestion to plan', err);
       setError('Unable to add that suggestion to your plan. Please try again.');
