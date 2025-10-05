@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useMemo, useRef, useState } from 'react';
+import { MutableRefObject, startTransition, useEffect, useMemo, useRef, useState } from 'react';
 import MapView from './components/MapView';
 import InfoPanel from './components/InfoPanel';
 import TripAdvisor from './components/TripAdvisor';
@@ -62,6 +62,14 @@ export type TripAdvisorSuggestion = {
   placeId?: string;
   latitude?: number;
   longitude?: number;
+};
+
+type LocationSearchResult = {
+  label: string;
+  address?: string | null;
+  placeId?: string | null;
+  latitude: number;
+  longitude: number;
 };
 
 export type TripAdvisorInfo = {
@@ -349,6 +357,16 @@ function App() {
   const [endDate, setEndDate] = useState('');
   const [motivation, setMotivation] = useState<string[]>([]);
   const [modalTouched, setModalTouched] = useState(false);
+  const [startSuggestions, setStartSuggestions] = useState<LocationSearchResult[]>([]);
+  const [endSuggestions, setEndSuggestions] = useState<LocationSearchResult[]>([]);
+  const [startSelection, setStartSelection] = useState<LocationSearchResult | null>(null);
+  const [endSelection, setEndSelection] = useState<LocationSearchResult | null>(null);
+  const startSearchIdRef = useRef(0);
+  const endSearchIdRef = useRef(0);
+  const startSearchTimeoutRef = useRef<number>();
+  const endSearchTimeoutRef = useRef<number>();
+  const startHideTimeoutRef = useRef<number>();
+  const endHideTimeoutRef = useRef<number>();
 
   const TRIP_MOTIVATIONS = [
     'Food',
@@ -364,6 +382,23 @@ function App() {
 
   const isModalValid = startPlace.trim() && endPlace.trim() && motivation.length > 0;
 
+  useEffect(() => {
+    return () => {
+      if (startSearchTimeoutRef.current) {
+        window.clearTimeout(startSearchTimeoutRef.current);
+      }
+      if (endSearchTimeoutRef.current) {
+        window.clearTimeout(endSearchTimeoutRef.current);
+      }
+      if (startHideTimeoutRef.current) {
+        window.clearTimeout(startHideTimeoutRef.current);
+      }
+      if (endHideTimeoutRef.current) {
+        window.clearTimeout(endHideTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const resetModal = () => {
     setPlanName('');
     setEditingName(false);
@@ -373,6 +408,26 @@ function App() {
     setEndDate('');
     setMotivation([]);
     setModalTouched(false);
+    setStartSuggestions([]);
+    setEndSuggestions([]);
+    setStartSelection(null);
+    setEndSelection(null);
+    if (startSearchTimeoutRef.current) {
+      window.clearTimeout(startSearchTimeoutRef.current);
+      startSearchTimeoutRef.current = undefined;
+    }
+    if (endSearchTimeoutRef.current) {
+      window.clearTimeout(endSearchTimeoutRef.current);
+      endSearchTimeoutRef.current = undefined;
+    }
+    if (startHideTimeoutRef.current) {
+      window.clearTimeout(startHideTimeoutRef.current);
+      startHideTimeoutRef.current = undefined;
+    }
+    if (endHideTimeoutRef.current) {
+      window.clearTimeout(endHideTimeoutRef.current);
+      endHideTimeoutRef.current = undefined;
+    }
   };
 
   const createClientGeneratedId = () => {
@@ -392,6 +447,141 @@ function App() {
     setPlans((prev) =>
       prev.map((plan) => (plan.id === planId ? { ...plan, summary: summary || '' } : plan)),
     );
+  };
+
+  const normaliseLocationResult = (raw: any): LocationSearchResult | null => {
+    if (!raw) {
+      return null;
+    }
+    const latitude = typeof raw.latitude === 'number' ? raw.latitude : Number(raw.latitude);
+    const longitude = typeof raw.longitude === 'number' ? raw.longitude : Number(raw.longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return null;
+    }
+    const label = typeof raw.label === 'string' && raw.label.trim().length
+      ? raw.label.trim()
+      : typeof raw.address === 'string' && raw.address.trim().length
+        ? raw.address.trim()
+        : undefined;
+    return {
+      label: label ?? 'Unnamed location',
+      address: typeof raw.address === 'string' ? raw.address : null,
+      placeId: typeof raw.placeId === 'string'
+        ? raw.placeId
+        : typeof raw.place_id === 'string'
+          ? raw.place_id
+          : null,
+      latitude,
+      longitude,
+    };
+  };
+
+  const fetchLocationSuggestions = async (
+    value: string,
+    limit: number,
+    setSuggestions: (results: LocationSearchResult[]) => void,
+    requestIdRef: MutableRefObject<number>
+  ) => {
+    const query = value.trim();
+    if (query.length < 3) {
+      setSuggestions([]);
+      return;
+    }
+    const requestId = ++requestIdRef.current;
+    try {
+      const response = await fetch(`${API_BASE_URL}/maps/search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, limit }),
+      });
+      if (!response.ok) {
+        throw new Error('Lookup failed');
+      }
+      const payload = await response.json();
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+      const results = Array.isArray(payload)
+        ? payload
+            .map(normaliseLocationResult)
+            .filter((item): item is LocationSearchResult => Boolean(item))
+        : [];
+      setSuggestions(results);
+    } catch (error) {
+      if (requestId === requestIdRef.current) {
+        setSuggestions([]);
+      }
+    }
+  };
+
+  const scheduleStartSearch = (value: string) => {
+    if (startSearchTimeoutRef.current) {
+      window.clearTimeout(startSearchTimeoutRef.current);
+    }
+    startSearchTimeoutRef.current = window.setTimeout(() => {
+      void fetchLocationSuggestions(value, 6, setStartSuggestions, startSearchIdRef);
+    }, 250);
+  };
+
+  const scheduleEndSearch = (value: string) => {
+    if (endSearchTimeoutRef.current) {
+      window.clearTimeout(endSearchTimeoutRef.current);
+    }
+    endSearchTimeoutRef.current = window.setTimeout(() => {
+      void fetchLocationSuggestions(value, 6, setEndSuggestions, endSearchIdRef);
+    }, 250);
+  };
+
+  const cancelStartHide = () => {
+    if (startHideTimeoutRef.current) {
+      window.clearTimeout(startHideTimeoutRef.current);
+      startHideTimeoutRef.current = undefined;
+    }
+  };
+
+  const cancelEndHide = () => {
+    if (endHideTimeoutRef.current) {
+      window.clearTimeout(endHideTimeoutRef.current);
+      endHideTimeoutRef.current = undefined;
+    }
+  };
+
+  const dismissStartSuggestions = () => {
+    cancelStartHide();
+    startHideTimeoutRef.current = window.setTimeout(() => {
+      setStartSuggestions([]);
+    }, 120);
+  };
+
+  const dismissEndSuggestions = () => {
+    cancelEndHide();
+    endHideTimeoutRef.current = window.setTimeout(() => {
+      setEndSuggestions([]);
+    }, 120);
+  };
+
+  const handleStartInputChange = (value: string) => {
+    setStartPlace(value);
+    setStartSelection(null);
+    scheduleStartSearch(value);
+  };
+
+  const handleEndInputChange = (value: string) => {
+    setEndPlace(value);
+    setEndSelection(null);
+    scheduleEndSearch(value);
+  };
+
+  const handleStartSuggestionSelect = (suggestion: LocationSearchResult) => {
+    setStartPlace(suggestion.label);
+    setStartSelection(suggestion);
+    setStartSuggestions([]);
+  };
+
+  const handleEndSuggestionSelect = (suggestion: LocationSearchResult) => {
+    setEndPlace(suggestion.label);
+    setEndSelection(suggestion);
+    setEndSuggestions([]);
   };
 
   type InsertStopOptions = {
@@ -777,32 +967,122 @@ function App() {
 
   const handleModalSave = async () => {
     setModalTouched(true);
-    if (!isModalValid) return;
-    setShowModal(false);
-    resetModal();
-    // For now, just call the old handleCreateNew logic
-    try {
-      setIsLoading(true);
-      const response = await fetch(`${API_BASE_URL}/generate-plan`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: 'Plan a day exploring Burnaby around SFU.' }),
-      });
-      if (!response.ok) {
-        throw new Error('Failed to generate a new plan');
+    if (!isModalValid) {
+      return;
+    }
+
+    const trimmedName = planName.trim();
+    const startLabel = startSelection?.label ?? startPlace.trim();
+    const endLabel = endSelection?.label ?? endPlace.trim();
+    const startCoords =
+      startSelection && Number.isFinite(startSelection.latitude) && Number.isFinite(startSelection.longitude)
+        ? ` (${startSelection.latitude.toFixed(4)}, ${startSelection.longitude.toFixed(4)})`
+        : '';
+    const endCoords =
+      endSelection && Number.isFinite(endSelection.latitude) && Number.isFinite(endSelection.longitude)
+        ? ` (${endSelection.latitude.toFixed(4)}, ${endSelection.longitude.toFixed(4)})`
+        : '';
+
+    const promptParts: string[] = [
+      'Plan a British Columbia travel itinerary that can be completed in a single day.'
+    ];
+    if (startLabel) {
+      promptParts.push(`Begin near ${startLabel}${startCoords}.`);
+    }
+    if (endLabel) {
+      promptParts.push(`Wrap up near ${endLabel}${endCoords}.`);
+    }
+    if (startDate && endDate) {
+      promptParts.push(`The travel window is ${startDate} to ${endDate}.`);
+    }
+    if (motivation.length) {
+      promptParts.push(`Focus on ${motivation.join(', ')} experiences.`);
+    }
+    promptParts.push(
+      'Keep all stops within British Columbia, add short descriptions, and balance the travel time so the route feels realistic.'
+    );
+
+    const creationPrompt = promptParts.join(' ');
+
+    const buildLocalPlan = (summaryOverride?: string): TravelPlan => {
+      const planId = createClientGeneratedId();
+      const startStop: PlanStop = {
+        label: startLabel || 'Starting Point',
+        description: startSelection?.address ?? '',
+        placeId: startSelection?.placeId ?? undefined,
+        latitude: startSelection?.latitude,
+        longitude: startSelection?.longitude,
+      };
+      const endStop: PlanStop = {
+        label: endLabel || 'Ending Point',
+        description: endSelection?.address ?? '',
+        placeId: endSelection?.placeId ?? undefined,
+        latitude: endSelection?.latitude,
+        longitude: endSelection?.longitude,
+      };
+
+      const stops: PlanStop[] = [startStop];
+      if (
+        endStop.label !== startStop.label ||
+        endStop.description !== startStop.description ||
+        endStop.latitude !== startStop.latitude ||
+        endStop.longitude !== startStop.longitude
+      ) {
+        stops.push(endStop);
       }
-      const planResponse: TravelPlanResponse = await response.json();
-      const plan = normalizePlan(planResponse);
+
+      const summaryText = summaryOverride ||
+        (motivation.length ? `Focus on ${motivation.join(', ')} in BC.` : 'Custom British Columbia route.');
+
+      return {
+        id: planId,
+        title: trimmedName || `${startLabel || 'BC'} Day Plan`,
+        summary: summaryText,
+        stops,
+        createdAt: new Date().toISOString(),
+      };
+    };
+
+    const applyPlan = (plan: TravelPlan) => {
       setPlans((prev) => [plan, ...prev]);
       setSelectedPlanId(plan.id);
       setSelectedStopRef(null);
       setAdvisorInfo(null);
       setAdvisorError(null);
       setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unexpected error creating a plan.');
+    };
+
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/generate-plan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: creationPrompt }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate a plan from the assistant.');
+      }
+
+      const planResponse: TravelPlanResponse = await response.json();
+      const generatedPlan = normalizePlan(planResponse);
+      if (trimmedName) {
+        generatedPlan.title = trimmedName;
+      }
+      applyPlan(generatedPlan);
+    } catch (error) {
+      const fallbackPlan = buildLocalPlan(
+        'Locally generated plan using your chosen start and end points. Add more stops when you are ready.'
+      );
+      applyPlan(fallbackPlan);
+      setError(error instanceof Error ? error.message : 'Created a local draft plan because the generator was unavailable.');
     } finally {
       setIsLoading(false);
+      setShowModal(false);
+      resetModal();
+      setDraftPlan(null);
+      setIsDraftDirty(false);
     }
   };
 
@@ -939,12 +1219,38 @@ function App() {
             <div className="modal__fields">
               <div className="modal__row">
                 <label>Start:</label>
-                <input
-                  type="text"
-                  value={startPlace}
-                  onChange={e => setStartPlace(e.target.value)}
-                  placeholder="Start location..."
-                />
+                <div className="modal__autocomplete">
+                  <input
+                    type="text"
+                    value={startPlace}
+                    onChange={(event) => handleStartInputChange(event.target.value)}
+                    onFocus={cancelStartHide}
+                    onBlur={dismissStartSuggestions}
+                    placeholder="Start location..."
+                  />
+                  {startSuggestions.length ? (
+                    <ul className="modal__suggestions" role="listbox">
+                      {startSuggestions.map((suggestion, index) => (
+                        <li key={suggestion.placeId ?? `${suggestion.label}-${index}`}>
+                          <button
+                            type="button"
+                            className="modal__suggestion"
+                            onMouseDown={(event) => {
+                              event.preventDefault();
+                              cancelStartHide();
+                              handleStartSuggestionSelect(suggestion);
+                            }}
+                          >
+                            <span className="modal__suggestion-primary">{suggestion.label}</span>
+                            {suggestion.address ? (
+                              <span className="modal__suggestion-secondary">{suggestion.address}</span>
+                            ) : null}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
                 <input
                   type="date"
                   value={startDate}
@@ -953,12 +1259,38 @@ function App() {
               </div>
               <div className="modal__row">
                 <label>End:</label>
-                <input
-                  type="text"
-                  value={endPlace}
-                  onChange={e => setEndPlace(e.target.value)}
-                  placeholder="End location..."
-                />
+                <div className="modal__autocomplete">
+                  <input
+                    type="text"
+                    value={endPlace}
+                    onChange={(event) => handleEndInputChange(event.target.value)}
+                    onFocus={cancelEndHide}
+                    onBlur={dismissEndSuggestions}
+                    placeholder="End location..."
+                  />
+                  {endSuggestions.length ? (
+                    <ul className="modal__suggestions" role="listbox">
+                      {endSuggestions.map((suggestion, index) => (
+                        <li key={suggestion.placeId ?? `${suggestion.label}-${index}`}>
+                          <button
+                            type="button"
+                            className="modal__suggestion"
+                            onMouseDown={(event) => {
+                              event.preventDefault();
+                              cancelEndHide();
+                              handleEndSuggestionSelect(suggestion);
+                            }}
+                          >
+                            <span className="modal__suggestion-primary">{suggestion.label}</span>
+                            {suggestion.address ? (
+                              <span className="modal__suggestion-secondary">{suggestion.address}</span>
+                            ) : null}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
                 <input
                   type="date"
                   value={endDate}

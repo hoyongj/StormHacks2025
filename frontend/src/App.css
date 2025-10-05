@@ -318,6 +318,66 @@
     transform: translateY(-1px);
 }
 
+.modal__autocomplete {
+    position: relative;
+    width: 100%;
+}
+
+.modal__autocomplete input[type="text"] {
+    width: 100%;
+}
+
+.modal__suggestions {
+    position: absolute;
+    top: calc(100% + 0.35rem);
+    left: 0;
+    right: 0;
+    margin: 0;
+    padding: 0.35rem;
+    list-style: none;
+    background: #ffffff;
+    border-radius: 14px;
+    border: 1px solid rgba(127, 90, 240, 0.22);
+    box-shadow: 0 12px 32px rgba(22, 25, 44, 0.12);
+    max-height: 240px;
+    overflow-y: auto;
+    z-index: 40;
+}
+
+.modal__suggestions li + li {
+    margin-top: 0.3rem;
+}
+
+.modal__suggestion {
+    width: 100%;
+    border: none;
+    background: transparent;
+    border-radius: 12px;
+    text-align: left;
+    padding: 0.55rem 0.65rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    cursor: pointer;
+    color: #1f2237;
+    font-size: 0.92rem;
+}
+
+.modal__suggestion:hover,
+.modal__suggestion:focus-visible {
+    background: rgba(127, 90, 240, 0.12);
+    outline: none;
+}
+
+.modal__suggestion-primary {
+    font-weight: 600;
+}
+
+.modal__suggestion-secondary {
+    font-size: 0.8rem;
+    color: #646a8c;
+}
+
 .btn--primary:not(:disabled):hover {
     box-shadow: 0 14px 28px rgba(127, 90, 240, 0.32);
 }
