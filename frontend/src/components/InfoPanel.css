@@ -10,6 +10,28 @@
   gap: 1rem;
 }
 
+.info__header-text {
+  flex: 1;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.info__title-input {
+  border: 1px solid rgba(127, 90, 240, 0.25);
+  border-radius: 12px;
+  padding: 0.55rem 0.75rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #16192c;
+  background: #ffffff;
+}
+
+.info__title-input:focus {
+  outline: none;
+  border-color: rgba(127, 90, 240, 0.6);
+  box-shadow: 0 0 0 3px rgba(127, 90, 240, 0.18);
+}
+
 .info__eyebrow {
   text-transform: uppercase;
   letter-spacing: 0.16em;
@@ -51,9 +73,44 @@
   line-height: 1.5;
 }
 
+.info__summary-input {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(127, 90, 240, 0.2);
+  background: #f9f9ff;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: #16192c;
+  resize: vertical;
+}
+
+.info__summary-input:focus {
+  outline: none;
+  border-color: rgba(127, 90, 240, 0.55);
+  box-shadow: 0 0 0 3px rgba(127, 90, 240, 0.18);
+  background: #ffffff;
+}
+
 .info__meta {
   font-size: 0.75rem;
   color: #7f7f92;
+}
+
+.info__delete-plan {
+  align-self: flex-start;
+  border: 1px solid rgba(228, 56, 94, 0.3);
+  background: rgba(228, 56, 94, 0.08);
+  color: #c02246;
+  padding: 0.45rem 0.9rem;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.info__delete-plan:hover {
+  background: rgba(228, 56, 94, 0.16);
 }
 
 .info__section--stops {
@@ -98,12 +155,55 @@
   margin-top: 0.2rem;
 }
 
+.info__stop-coordinates {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  color: #7f7f92;
+  letter-spacing: 0.04em;
+}
+
 .info__plans {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
   gap: 0.5rem;
+}
+
+.info__plan-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.info__plan-remove {
+  border: none;
+  background: rgba(0, 0, 0, 0.04);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-weight: 600;
+  color: #5a5b70;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.info__plan-remove:hover {
+  background: rgba(228, 56, 94, 0.12);
+  color: #c02246;
+}
+
+.info__history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.info__history-hint {
+  font-size: 0.75rem;
+  color: #8a8aa0;
 }
 
 .info__plan {

@@ -101,7 +101,29 @@ function App() {
   const [advisorInfo, setAdvisorInfo] = useState<TripAdvisorInfo | null>(null);
   const [advisorError, setAdvisorError] = useState<string | null>(null);
   const [advisorLoading, setAdvisorLoading] = useState<boolean>(false);
-  const [selectedStop, setSelectedStop] = useState<PlanStop | null>(null);
+  const [selectedStopRef, setSelectedStopRef] = useState<{ planId: string; index: number } | null>(null);
+
+  const selectedPlan = plans.find((plan) => plan.id === selectedPlanId) ?? null;
+  const selectedPlanStops = useMemo(() => selectedPlan?.stops ?? [], [selectedPlan]);
+
+  const selectedStop = useMemo(() => {
+    if (!selectedPlan || !selectedStopRef) {
+      return null;
+    }
+    if (selectedStopRef.planId !== selectedPlan.id) {
+      return null;
+    }
+    return selectedPlanStops[selectedStopRef.index] ?? null;
+  }, [selectedPlan, selectedPlanStops, selectedStopRef]);
+
+  const selectedStopIndex = useMemo(() => {
+    if (!selectedPlan || !selectedStopRef) {
+      return null;
+    }
+    return selectedStopRef.planId === selectedPlan.id ? selectedStopRef.index : null;
+  }, [selectedPlan, selectedStopRef]);
+
+  const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
     async function loadPlans() {
@@ -114,6 +136,9 @@ function App() {
         const normalized = payload.options.map(normalizePlan);
         setPlans(normalized);
         setSelectedPlanId((prev) => (prev ? prev : normalized[0]?.id ?? ''));
+        setSelectedStopRef(null);
+        setAdvisorInfo(null);
+        setAdvisorError(null);
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unexpected error loading plans.');
@@ -125,11 +150,6 @@ function App() {
     loadPlans();
   }, []);
 
-  const selectedPlan = plans.find((plan) => plan.id === selectedPlanId) ?? null;
-  const selectedPlanStops = useMemo(() => selectedPlan?.stops ?? [], [selectedPlan]);
-
-  // Modal state for creating a new plan
-  const [showModal, setShowModal] = useState(false);
   const [planName, setPlanName] = useState('');
   const [editingName, setEditingName] = useState(false);
   const [startPlace, setStartPlace] = useState('');
@@ -164,6 +184,120 @@ function App() {
     setModalTouched(false);
   };
 
+  const createClientGeneratedId = () => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return 'local-' + crypto.randomUUID();
+    }
+    return 'local-' + Math.random().toString(36).slice(2, 10);
+  };
+
+  const handlePlanTitleChange = (planId: string, title: string) => {
+    setPlans((prev) =>
+      prev.map((plan) => (plan.id === planId ? { ...plan, title: title || '' } : plan)),
+    );
+  };
+
+  const handlePlanSummaryChange = (planId: string, summary: string) => {
+    setPlans((prev) =>
+      prev.map((plan) => (plan.id === planId ? { ...plan, summary: summary || '' } : plan)),
+    );
+  };
+
+  const handleAddStop = (planId: string) => {
+    setPlans((prev) =>
+      prev.map((plan) => {
+        if (plan.id !== planId) {
+          return plan;
+        }
+        const nextIndex = plan.stops.length + 1;
+        const newStop: PlanStop = {
+          label: `New Stop ${nextIndex}`,
+          description: '',
+        };
+        return { ...plan, stops: [...plan.stops, newStop] };
+      }),
+    );
+  };
+
+  const handleUpdateStop = (planId: string, stopIndex: number, updates: Partial<PlanStop>) => {
+    let updatedStop: PlanStop | null = null;
+    setPlans((prev) =>
+      prev.map((plan) => {
+        if (plan.id !== planId) {
+          return plan;
+        }
+        const stops = plan.stops.map((stop, index) => {
+          if (index !== stopIndex) {
+            return stop;
+          }
+          updatedStop = { ...stop, ...updates };
+          return updatedStop;
+        });
+        return { ...plan, stops };
+      }),
+    );
+    if (
+      planId === selectedPlanId &&
+      updatedStop &&
+      selectedStopRef &&
+      selectedStopRef.planId === planId &&
+      selectedStopRef.index === stopIndex
+    ) {
+      setSelectedStopRef({ planId, index: stopIndex });
+    }
+  };
+
+  const handleRemoveStop = (planId: string, stopIndex: number) => {
+    setPlans((prev) =>
+      prev.map((plan) => {
+        if (plan.id !== planId) {
+          return plan;
+        }
+        const stops = plan.stops.filter((_, index) => index !== stopIndex);
+        return { ...plan, stops };
+      }),
+    );
+
+    if (selectedStopRef && selectedStopRef.planId === planId) {
+      if (selectedStopRef.index === stopIndex) {
+        setSelectedStopRef(null);
+        setAdvisorInfo(null);
+        setAdvisorError(null);
+      } else if (selectedStopRef.index > stopIndex) {
+        setSelectedStopRef({ planId, index: selectedStopRef.index - 1 });
+      }
+    }
+  };
+
+  const handleCreateLocalPlan = () => {
+    const newPlan: TravelPlan = {
+      id: createClientGeneratedId(),
+      title: 'Untitled Plan',
+      summary: 'Describe this adventure so it stands out in your library.',
+      stops: [],
+      createdAt: new Date().toISOString(),
+    };
+    setPlans((prev) => [newPlan, ...prev]);
+    setSelectedPlanId(newPlan.id);
+    setSelectedStopRef(null);
+    setAdvisorInfo(null);
+    setAdvisorError(null);
+  };
+
+  const handleDeletePlan = (planId: string) => {
+    setPlans((prev) => {
+      const updated = prev.filter((plan) => plan.id !== planId);
+      if (selectedPlanId === planId) {
+        const fallback = updated[0]?.id ?? '';
+        setSelectedPlanId(fallback);
+        setSelectedStopRef(null);
+        setAdvisorInfo(null);
+        setAdvisorError(null);
+      }
+      return updated;
+    });
+  };
+
   const handleModalSave = async () => {
     setModalTouched(true);
     if (!isModalValid) return;
@@ -184,6 +318,9 @@ function App() {
       const plan = normalizePlan(planResponse);
       setPlans((prev) => [plan, ...prev]);
       setSelectedPlanId(plan.id);
+      setSelectedStopRef(null);
+      setAdvisorInfo(null);
+      setAdvisorError(null);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unexpected error creating a plan.');
@@ -192,8 +329,11 @@ function App() {
     }
   };
 
-  const handleStopSelected = async (stop: PlanStop) => {
-    setSelectedStop(stop);
+  const handleStopSelected = async (stop: PlanStop, stopIndex: number) => {
+    if (!selectedPlan) {
+      return;
+    }
+    setSelectedStopRef({ planId: selectedPlan.id, index: stopIndex });
     setAdvisorLoading(true);
     setAdvisorError(null);
     try {
@@ -224,7 +364,7 @@ function App() {
   useEffect(() => {
     setAdvisorInfo(null);
     setAdvisorError(null);
-    setSelectedStop(null);
+    setSelectedStopRef(null);
   }, [selectedPlanId]);
 
   return (
@@ -338,6 +478,10 @@ function App() {
             plans={plans}
             selectedPlanId={selectedPlanId}
             onSelectPlan={setSelectedPlanId}
+            onUpdatePlanTitle={handlePlanTitleChange}
+            onUpdatePlanSummary={handlePlanSummaryChange}
+            onCreatePlan={handleCreateLocalPlan}
+            onDeletePlan={handleDeletePlan}
           />
         </aside>
 
@@ -352,7 +496,10 @@ function App() {
                 plan={selectedPlan}
                 isLoading={isLoading}
                 onSelectStop={handleStopSelected}
-                selectedStopLabel={selectedStop?.label}
+                selectedStopIndex={selectedStopIndex}
+                onAddStop={selectedPlan ? () => handleAddStop(selectedPlan.id) : undefined}
+                onUpdateStop={selectedPlan ? (index, updates) => handleUpdateStop(selectedPlan.id, index, updates) : undefined}
+                onRemoveStop={selectedPlan ? (index) => handleRemoveStop(selectedPlan.id, index) : undefined}
               />
             </div>
           </div>
