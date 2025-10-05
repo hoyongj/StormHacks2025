@@ -5,6 +5,7 @@ import TripAdvisor from './components/TripAdvisor';
 import AiAssistantPanel from './components/AiAssistantPanel';
 import ToGoList from './components/ToGoList';
 import PlanManager from './components/PlanManager';
+import AdminPanel from './components/AdminPanel';
 import './App.css';
 
 export type PlanStop = {
@@ -90,6 +91,13 @@ export type Folder = {
   planIds: string[];
 };
 
+export type UserProfile = {
+  name: string;
+  email: string;
+  homeCity: string;
+  bio?: string;
+};
+
 type MapRouteResponse = {
   plan_id: string;
   polyline: string;
@@ -145,8 +153,14 @@ function App() {
   const [advisorLoading, setAdvisorLoading] = useState<boolean>(false);
   const [selectedStopRef, setSelectedStopRef] = useState<{ planId: string; index: number } | null>(null);
   const [routeSegments, setRouteSegments] = useState<RouteSegment[]>([]);
-  const [view, setView] = useState<'planner' | 'manager'>('planner');
+  const [view, setView] = useState<'planner' | 'manager' | 'admin'>('planner');
   const [folders, setFolders] = useState<Folder[]>([{ id: 'all', name: 'All Plans', planIds: [] }]);
+  const [profile, setProfile] = useState<UserProfile>({
+    name: 'Jamie Hoang',
+    email: 'jamie.hoang@example.com',
+    homeCity: 'Vancouver, BC',
+    bio: 'Train-hopping foodie who loves scenic detours.'
+  });
 
   const selectedPlan = plans.find((plan) => plan.id === selectedPlanId) ?? null;
   const selectedPlanStops = useMemo(() => selectedPlan?.stops ?? [], [selectedPlan]);
@@ -448,6 +462,10 @@ function App() {
     );
   };
 
+  const handleUpdateProfile = (updates: Partial<UserProfile>) => {
+    setProfile((prev) => ({ ...prev, ...updates }));
+  };
+
   const handleDeletePlan = (planId: string) => {
     setPlans((prev) => {
       const updated = prev.filter((plan) => plan.id !== planId);
@@ -537,13 +555,23 @@ function App() {
       <header className="app__header">
         <h1>Pathfinder</h1>
         <div className="app__header-actions">
-          <button
-            type="button"
-            className="app__nav-button"
-            onClick={() => setView((prev) => (prev === 'planner' ? 'manager' : 'planner'))}
-          >
-            {view === 'planner' ? 'Manage Plans' : 'Back to Planner'}
-          </button>
+          {view !== 'planner' ? (
+            <button
+              type="button"
+              className="app__nav-button"
+              onClick={() => setView('planner')}
+            >
+              Back to Planner
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="app__nav-button"
+              onClick={() => setView('manager')}
+            >
+              Manage Plans
+            </button>
+          )}
           {view === 'planner' ? (
             <button
               type="button"
@@ -554,7 +582,19 @@ function App() {
               Create New Plan
             </button>
           ) : null}
-          <div className="app__profile">JH</div>
+          <button
+            type="button"
+            className={view === 'admin' ? 'app__profile-button app__profile-button--active' : 'app__profile-button'}
+            onClick={() => setView('admin')}
+            aria-label="Open profile settings"
+          >
+            <span className="app__profile-icon" aria-hidden>
+              <svg viewBox="0 0 24 24" focusable="false">
+                <circle cx="12" cy="8" r="4" />
+                <path d="M4 19c0-3.3137 3.134-6 7-6h2c3.866 0 7 2.6863 7 6v1H4v-1z" />
+              </svg>
+            </span>
+          </button>
         </div>
       </header>
 
@@ -691,7 +731,7 @@ function App() {
             <AiAssistantPanel />
           </aside>
         </div>
-      ) : (
+      ) : view === 'manager' ? (
         <PlanManager
           plans={plans}
           folders={folders}
@@ -699,6 +739,8 @@ function App() {
           onAssignPlan={handleAssignPlanToFolder}
           onRemovePlan={handleRemovePlanFromFolder}
         />
+      ) : (
+        <AdminPanel profile={profile} onUpdateProfile={handleUpdateProfile} />
       )}
     </div>
   );
