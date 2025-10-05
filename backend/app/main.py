@@ -68,7 +68,13 @@ async def get_route(plan_id: str) -> MapRoute:
         raise HTTPException(status_code=404, detail="Plan not found")
 
     polyline = await maps_client.build_route_polyline(plan.stops)
-    return MapRoute(plan_id=plan_id, polyline=polyline, warnings=[])
+    segments = maps_client.get_last_segments()
+    return MapRoute(
+        plan_id=plan_id,
+        polyline=polyline,
+        warnings=maps_client.get_last_warnings(),
+        segments=segments,
+    )
 
 
 @app.get("/api/config/maps-key")
