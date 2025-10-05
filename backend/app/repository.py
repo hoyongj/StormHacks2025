@@ -45,6 +45,7 @@ def init_db() -> None:
 
     if not list_plan_ids():
         seed_sample_plan()
+        seed_ubc_plan()
 
 
 @contextmanager
@@ -185,6 +186,42 @@ def seed_sample_plan() -> None:
                 description="Wrap up under the iconic canopy—perfect for photos and group meetups.",
                 latitude=49.277055,
                 longitude=-122.9173,
+            ),
+        ],
+    )
+    save_plan(sample)
+
+
+def seed_ubc_plan() -> None:
+    sample = TravelPlan(
+        id="sample-ubc",
+        title="University of British Columbia Day",
+        summary="Discover UBC's vibrant Vancouver campus with ocean views, museums, and hidden study spots.",
+        created_at=datetime.utcnow(),
+        stops=[
+            PlanStop(
+                label="Main Mall",
+                description="Start at the heart of campus with views down to the Clock Tower.",
+                latitude=49.2669,
+                longitude=-123.2531,
+            ),
+            PlanStop(
+                label="UBC Museum of Anthropology",
+                description="Explore world-renowned Indigenous art and architecture.",
+                latitude=49.2692,
+                longitude=-123.2587,
+            ),
+            PlanStop(
+                label="Nitobe Memorial Garden",
+                description="Take a peaceful stroll through the Japanese garden's greenery.",
+                latitude=49.2631,
+                longitude=-123.2558,
+            ),
+            PlanStop(
+                label="Wreck Beach Lookout",
+                description="Wrap up with sunset views over the Strait of Georgia.",
+                latitude=49.2576,
+                longitude=-123.2593,
             ),
         ],
     )
