@@ -74,11 +74,21 @@ class Place(BaseModel):
     tags: List[str] = Field(default_factory=list)
 
 
+class PlaceSuggestion(BaseModel):
+    name: str
+    rating: Optional[float] = Field(default=None, ge=0.0, le=5.0)
+    total_ratings: Optional[int] = Field(default=None, ge=0)
+    address: Optional[str] = None
+    price_level: Optional[int] = Field(default=None, ge=0, le=4)
+    open_now: Optional[bool] = None
+    types: List[str] = Field(default_factory=list)
+
+
 class PlaceInfo(Place):
     summary: Optional[str] = None
-    nearby_restaurants: List[str] = Field(default_factory=list)
-    nearby_hotels: List[str] = Field(default_factory=list)
-    nearby_attractions: List[str] = Field(default_factory=list)
+    nearby_restaurants: List[PlaceSuggestion] = Field(default_factory=list)
+    nearby_hotels: List[PlaceSuggestion] = Field(default_factory=list)
+    nearby_attractions: List[PlaceSuggestion] = Field(default_factory=list)
     external_url: Optional[HttpUrl] = None
     source: Literal["tripadvisor", "stub"] = "stub"
 
@@ -330,6 +340,7 @@ __all__ = [
     "MapInteractionInterface",
     "Place",
     "PlaceInfo",
+    "PlaceSuggestion",
     "PlaceInfoRequest",
     "PlaceInfoResponse",
     "PlaceListEntry",

@@ -42,6 +42,16 @@ type PlanStopResponse = {
   longitude?: number;
 };
 
+export type TripAdvisorSuggestion = {
+  name: string;
+  rating?: number;
+  totalRatings?: number;
+  address?: string;
+  priceLevel?: number;
+  openNow?: boolean;
+  types: string[];
+};
+
 export type TripAdvisorInfo = {
   id: string;
   name: string;
@@ -49,9 +59,9 @@ export type TripAdvisorInfo = {
   country?: string;
   address?: string;
   summary?: string;
-  nearbyRestaurants: string[];
-  nearbyHotels: string[];
-  nearbyAttractions: string[];
+  nearbyRestaurants: TripAdvisorSuggestion[];
+  nearbyHotels: TripAdvisorSuggestion[];
+  nearbyAttractions: TripAdvisorSuggestion[];
   latitude?: number;
   longitude?: number;
 };
@@ -64,11 +74,21 @@ type TripAdvisorResponsePayload = {
     country?: string;
     address?: string;
     summary?: string;
-    nearby_restaurants: string[];
-    nearby_hotels: string[];
-    nearby_attractions: string[];
+    nearby_restaurants: TripAdvisorSuggestionPayload[];
+    nearby_hotels: TripAdvisorSuggestionPayload[];
+    nearby_attractions: TripAdvisorSuggestionPayload[];
     coordinates: { latitude: number; longitude: number };
   };
+};
+
+type TripAdvisorSuggestionPayload = {
+  name: string;
+  rating?: number;
+  total_ratings?: number;
+  address?: string;
+  price_level?: number;
+  open_now?: boolean;
+  types?: string[];
 };
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api';
@@ -377,11 +397,23 @@ function normalizeTripAdvisorInfo(info: TripAdvisorResponsePayload['info']): Tri
     country: info.country,
     address: info.address,
     summary: info.summary,
-    nearbyRestaurants: info.nearby_restaurants,
-    nearbyHotels: info.nearby_hotels,
-    nearbyAttractions: info.nearby_attractions,
+    nearbyRestaurants: info.nearby_restaurants.map(normalizeSuggestion),
+    nearbyHotels: info.nearby_hotels.map(normalizeSuggestion),
+    nearbyAttractions: info.nearby_attractions.map(normalizeSuggestion),
     latitude: info.coordinates?.latitude,
     longitude: info.coordinates?.longitude,
+  };
+}
+
+function normalizeSuggestion(suggestion: TripAdvisorSuggestionPayload): TripAdvisorSuggestion {
+  return {
+    name: suggestion.name,
+    rating: suggestion.rating,
+    totalRatings: suggestion.total_ratings,
+    address: suggestion.address,
+    priceLevel: suggestion.price_level,
+    openNow: suggestion.open_now,
+    types: suggestion.types ?? [],
   };
 }
 

@@ -147,12 +147,23 @@
 }
 
 .advisor__tooltip span {
-    color: rgba(246, 247, 255, 1);
+    color: rgba(246, 247, 255, 0.85);
+}
+
+.advisor__tooltip-rating {
+    font-weight: 600;
+    color: #ffffff;
+}
+
+.advisor__tooltip-price,
+.advisor__tooltip-address,
+.advisor__tooltip-status {
+    color: rgba(246, 247, 255, 0.9);
 }
 
 .advisor__item:hover .advisor__tooltip,
 .advisor__item:focus .advisor__tooltip {
-    opacity: 100;
+    opacity: 1;
     transform: translate(-50%, calc(100% + 6px));
 }
 

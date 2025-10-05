@@ -7,7 +7,13 @@ from typing import Dict, List, Optional
 
 import httpx
 
-from ..schemas import Coordinates, PlaceInfo, TripAdvisorInterface, TripAdvisorRequest
+from ..schemas import (
+    Coordinates,
+    PlaceInfo,
+    PlaceSuggestion,
+    TripAdvisorInterface,
+    TripAdvisorRequest,
+)
 
 PLACES_DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json"
 PLACES_NEARBY_URL = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
@@ -118,7 +124,9 @@ class TripAdvisorService(TripAdvisorInterface):
             "summary": request.description,
         }
 
-    async def _fetch_nearby(self, latitude: Optional[float], longitude: Optional[float], place_type: str) -> List[str]:
+    async def _fetch_nearby(
+        self, latitude: Optional[float], longitude: Optional[float], place_type: str
+    ) -> List[PlaceSuggestion]:
         if latitude is None or longitude is None:
             return []
 
@@ -133,7 +141,7 @@ class TripAdvisorService(TripAdvisorInterface):
                 params["keyword"] = keyword
             return params
 
-        async def _query(params: dict) -> List[str]:
+        async def _query(params: dict) -> List[PlaceSuggestion]:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(PLACES_NEARBY_URL, params=params)
             response.raise_for_status()
@@ -141,14 +149,26 @@ class TripAdvisorService(TripAdvisorInterface):
             if payload.get("status") != "OK":
                 return []
             results = payload.get("results", [])
-            names: List[str] = []
+            suggestions: List[PlaceSuggestion] = []
             for item in results:
                 name = item.get("name")
-                if name:
-                    names.append(name)
-                if len(names) >= 3:
+                if not name:
+                    continue
+                suggestion = PlaceSuggestion(
+                    name=name,
+                    rating=item.get("rating"),
+                    total_ratings=item.get("user_ratings_total"),
+                    address=item.get("vicinity"),
+                    price_level=item.get("price_level"),
+                    open_now=item.get("opening_hours", {}).get("open_now")
+                    if isinstance(item.get("opening_hours"), dict)
+                    else None,
+                    types=[t for t in item.get("types", []) if isinstance(t, str)],
+                )
+                suggestions.append(suggestion)
+                if len(suggestions) >= 3:
                     break
-            return names
+            return suggestions
 
         # First attempt: tight radius around the location.
         names = await _query(_build_params(radius=800))
@@ -185,13 +205,23 @@ class TripAdvisorService(TripAdvisorInterface):
             source="tripadvisor",
         )
 
-    def _fallback_category(self, category: str, context: str) -> List[str]:
+    def _fallback_category(self, category: str, context: str) -> List[PlaceSuggestion]:
         random.seed(f"{category}-{context}")
-        return [
-            f"{category} {random.randint(101, 199)}",
-            f"{context} {category} Lounge",
-            f"{category} at {context} Plaza",
-        ]
+        suggestions: List[PlaceSuggestion] = []
+        resolved_context = context or "This stop"
+        for idx in range(3):
+            suggestions.append(
+                PlaceSuggestion(
+                    name=f"{resolved_context} {category} {idx + 1}",
+                    rating=round(random.uniform(3.8, 4.8), 1),
+                    total_ratings=random.randint(25, 320),
+                    address=f"{random.randint(100, 999)} {resolved_context} Street",
+                    price_level=random.randint(1, 3),
+                    open_now=random.choice([True, False]),
+                    types=[category.lower()],
+                )
+            )
+        return suggestions
 
 
 def _parse_address_components(components: List[dict]) -> Dict[str, str]:
