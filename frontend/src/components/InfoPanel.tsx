@@ -120,9 +120,7 @@ function InfoPanel({
                       <div className="info__stop-connector" aria-hidden>
                         <span className="info__connector-icon">{connectorIconText}</span>
                         <div>
-                          <span className="info__connector-mode">
-                            {connectorLabel || 'Transit'}
-                          </span>
+                          <span className="info__connector-mode">{connectorLabel || 'Transit'}</span>
                           <span className="info__connector-metrics">{travelSummary}</span>
                           {segment?.instructions ? (
                             <span className="info__connector-note">{segment.instructions}</span>
@@ -134,31 +132,6 @@ function InfoPanel({
                 </li>
               );
             })
-            plan.stops.map((stop, index) => (
-              <li key={stop.label + index}>
-                <span className="info__stop-number">{index + 1}</span>
-                <div>
-                  <span className="info__stop-title">{stop.label || 'Untitled stop'}</span>
-                  {stop.description ? <span className="info__stop-desc">{stop.description}</span> : null}
-                  {stop.latitude !== undefined && stop.longitude !== undefined ? (
-                    <span className="info__stop-coordinates">
-                      {stop.latitude.toFixed(4)}, {stop.longitude.toFixed(4)}
-                    </span>
-                  ) : null}
-                  {typeof stop.timeToSpendDays === 'number' || typeof stop.timeToSpendHours === 'number' || typeof stop.timeToSpendMinutes === 'number' ? (
-                    <span className="info__stop-duration">
-                      {[
-                        stop.timeToSpendDays ? `${stop.timeToSpendDays}d` : null,
-                        stop.timeToSpendHours ? `${stop.timeToSpendHours}h` : null,
-                        stop.timeToSpendMinutes ? `${stop.timeToSpendMinutes}m` : null,
-                      ]
-                        .filter(Boolean)
-                        .join(' ') || '0m'}
-                    </span>
-                  ) : null}
-                </div>
-              </li>
-            ))
           ) : (
             <li className="info__empty">Add a stop to build out your itinerary.</li>
           )}
