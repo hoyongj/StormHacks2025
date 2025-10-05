@@ -1,4 +1,5 @@
-import { startTransition, useEffect, useMemo, useRef, useState } from 'react';
+import { Loader } from '@googlemaps/js-api-loader';
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MapView from './components/MapView';
 import InfoPanel from './components/InfoPanel';
 import TripAdvisor from './components/TripAdvisor';
@@ -143,6 +144,7 @@ type TripAdvisorSuggestionPayload = {
 };
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api';
+const EMBEDDED_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? null;
 
 function App() {
   const [plans, setPlans] = useState<TravelPlan[]>([]);
@@ -152,8 +154,10 @@ function App() {
   const [advisorInfo, setAdvisorInfo] = useState<TripAdvisorInfo | null>(null);
   const [advisorError, setAdvisorError] = useState<string | null>(null);
   const [advisorLoading, setAdvisorLoading] = useState<boolean>(false);
+  const [isAddingSuggestion, setIsAddingSuggestion] = useState(false);
   const [selectedStopRef, setSelectedStopRef] = useState<{ planId: string; index: number } | null>(null);
   const [routeSegments, setRouteSegments] = useState<RouteSegment[]>([]);
+  const [routeRefreshTick, setRouteRefreshTick] = useState(0);
   const [view, setView] = useState<'planner' | 'manager' | 'admin'>('planner');
   const [folders, setFolders] = useState<Folder[]>([{ id: 'all', name: 'All Plans', planIds: [] }]);
   const [libraryFolderId, setLibraryFolderId] = useState('all');
@@ -173,6 +177,10 @@ function App() {
   const [draftPlan, setDraftPlan] = useState<TravelPlan | null>(null);
   const [isDraftDirty, setIsDraftDirty] = useState(false);
   const latestAdvisorRequest = useRef(0);
+  const placesLoaderRef = useRef<Loader | null>(null);
+  const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
+  const placesServiceContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapsKeyRequestRef = useRef<Promise<string | null> | null>(null);
 
   const selectedPlan = useMemo(
     () => plans.find((plan) => plan.id === selectedPlanId) ?? null,
@@ -197,6 +205,122 @@ function App() {
     }
     return selectedStopRef.planId === workingPlan.id ? selectedStopRef.index : null;
   }, [workingPlan, selectedStopRef]);
+
+  const resolveMapsKey = useCallback(async () => {
+    if (EMBEDDED_MAPS_KEY) {
+      return EMBEDDED_MAPS_KEY;
+    }
+    if (typeof window === 'undefined') {
+      return null;
+    }
+    if (!mapsKeyRequestRef.current) {
+      const endpoint = `${window.location.origin}/api/config/maps-key`;
+      mapsKeyRequestRef.current = fetch(endpoint)
+        .then((response) => (response.ok ? response.json() : null))
+        .then((payload: { googleMapsApiKey?: string } | null) => payload?.googleMapsApiKey ?? null)
+        .catch(() => null);
+    }
+    return mapsKeyRequestRef.current;
+  }, []);
+
+  const ensureGooglePlaces = useCallback(async (): Promise<typeof google | null> => {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+    if (window.google?.maps?.places) {
+      return window.google;
+    }
+
+    const apiKey = await resolveMapsKey();
+    if (!apiKey) {
+      return null;
+    }
+
+    const loader = (placesLoaderRef.current ??= new Loader({ apiKey, version: 'weekly', libraries: ['places'] }));
+    try {
+      const googleMaps = await loader.load();
+      return googleMaps;
+    } catch {
+      return null;
+    }
+  }, [resolveMapsKey]);
+
+  const resolveTripAdvisorSuggestion = useCallback(
+    async (suggestion: TripAdvisorSuggestion, context: TripAdvisorInfo | null): Promise<PlanStop> => {
+      const fallback: PlanStop = {
+        label: suggestion.name,
+        description: suggestion.address ?? '',
+      };
+
+      const googleMaps = await ensureGooglePlaces();
+      if (!googleMaps?.maps?.places) {
+        return fallback;
+      }
+
+      const container = placesServiceContainerRef.current ?? document.createElement('div');
+      placesServiceContainerRef.current = container;
+      const service = (placesServiceRef.current ??= new googleMaps.maps.places.PlacesService(container));
+
+      const query = suggestion.address ? `${suggestion.name}, ${suggestion.address}` : suggestion.name;
+      let biasCenter: google.maps.LatLng | undefined;
+      if (typeof context?.latitude === 'number' && typeof context?.longitude === 'number') {
+        biasCenter = new googleMaps.maps.LatLng(context.latitude, context.longitude);
+      }
+
+      const lookupPlace = async (): Promise<google.maps.places.PlaceResult | null> =>
+        await new Promise((resolve) => {
+          const request: google.maps.places.FindPlaceFromQueryRequest = {
+            query,
+            fields: ['name', 'geometry', 'formatted_address', 'place_id'],
+          };
+          if (biasCenter) {
+            request.locationBias = { center: biasCenter, radius: 2500 };
+          }
+          service.findPlaceFromQuery(request, (results, status) => {
+            if (status === googleMaps.maps.places.PlacesServiceStatus.OK && results && results[0]) {
+              resolve(results[0]);
+            } else {
+              resolve(null);
+            }
+          });
+        });
+
+      const fallbackPlace = async (): Promise<google.maps.places.PlaceResult | null> => {
+        if (!biasCenter) {
+          return null;
+        }
+        return await new Promise((resolve) => {
+          const request: google.maps.places.TextSearchRequest = {
+            query,
+            location: biasCenter,
+            radius: 5000,
+          };
+          service.textSearch(request, (results, status) => {
+            if (status === googleMaps.maps.places.PlacesServiceStatus.OK && results && results[0]) {
+              resolve(results[0]);
+            } else {
+              resolve(null);
+            }
+          });
+        });
+      };
+
+      const place = (await lookupPlace()) ?? (await fallbackPlace());
+      if (!place) {
+        return fallback;
+      }
+
+      const location = place.geometry?.location;
+      return {
+        label: place.name ?? fallback.label,
+        description: place.formatted_address ?? place.vicinity ?? fallback.description,
+        placeId: place.place_id ?? undefined,
+        latitude: location ? location.lat() : undefined,
+        longitude: location ? location.lng() : undefined,
+      };
+    },
+    [ensureGooglePlaces],
+  );
 
   useEffect(() => {
     if (!selectedPlan) {
@@ -333,7 +457,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [selectedPlan, selectedPlanId, view]);
+  }, [selectedPlan, selectedPlanId, view, routeRefreshTick]);
 
   const [planName, setPlanName] = useState('');
   const [editingName, setEditingName] = useState(false);
@@ -388,6 +512,7 @@ function App() {
     );
   };
 
+<<<<<<< HEAD
   type InsertStopOptions = {
     index?: number;
     select?: boolean;
@@ -429,6 +554,52 @@ function App() {
         return current;
       });
       setRouteSegments([]);
+=======
+  const handleAddTripAdvisorStop = async (suggestion: TripAdvisorSuggestion) => {
+    const planForEdit = draftPlan ?? selectedPlan;
+    if (!planForEdit) {
+      setError('Select a plan before adding new stops.');
+      return;
+    }
+
+    setIsAddingSuggestion(true);
+    try {
+      const resolved = await resolveTripAdvisorSuggestion(suggestion, advisorInfo);
+
+      const basePlan = clonePlan(planForEdit);
+
+      const stops = [...basePlan.stops];
+      const insertionIndex = (() => {
+        if (selectedStopIndex === null || selectedStopIndex < 0) {
+          return stops.length;
+        }
+        return Math.min(stops.length, Math.max(0, selectedStopIndex + 1));
+      })();
+
+      const newStop: PlanStop = {
+        label: resolved.label || suggestion.name,
+        description: resolved.description ?? suggestion.address ?? '',
+        placeId: resolved.placeId,
+        latitude: resolved.latitude,
+        longitude: resolved.longitude,
+      };
+
+      stops.splice(insertionIndex, 0, newStop);
+      const nextPlan = { ...basePlan, stops };
+
+      setDraftPlan(nextPlan);
+      setIsDraftDirty(true);
+      setRouteSegments([]);
+      setError(null);
+      setAdvisorInfo(null);
+      setAdvisorError(null);
+      setSelectedStopRef({ planId: nextPlan.id, index: insertionIndex });
+    } catch (err) {
+      console.error('Failed to add suggestion to plan', err);
+      setError('Unable to add that suggestion to your plan. Please try again.');
+    } finally {
+      setIsAddingSuggestion(false);
+>>>>>>> polyline
     }
   };
 
@@ -600,6 +771,7 @@ function App() {
       setDraftPlan(clonePlan(savedPlan));
       setIsDraftDirty(false);
       setError(null);
+      setRouteRefreshTick((tick) => tick + 1);
     } catch (err) {
       console.error('Failed to save plan updates', err);
       setError('Unable to save plan changes. Please try again.');
@@ -1036,8 +1208,14 @@ function App() {
               info={advisorInfo}
               isLoading={advisorLoading}
               error={advisorError}
+<<<<<<< HEAD
               stops={draftPlan?.stops ?? selectedPlan?.stops ?? []}
               onAddSuggestion={draftPlan ? handleAddSuggestionStop : undefined}
+=======
+              stops={selectedPlan?.stops ?? []}
+              onAddSuggestion={handleAddTripAdvisorStop}
+              isAddingSuggestion={isAddingSuggestion}
+>>>>>>> polyline
             />
           </section>
 
