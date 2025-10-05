@@ -1,3 +1,23 @@
+/* Create New Plan button style (moved from ToGoList.css) */
+.info__create {
+  background: linear-gradient(135deg, #7f5af0, #2cb1bc);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.6rem 1.2rem;
+  font-weight: 500;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: 0.2s ease;
+  box-shadow: 0 1px 4px rgba(127, 90, 240, 0.08);
+}
+.info__create:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.info__create:hover:not(:disabled) {
+  opacity: 0.9;
+}
 :root {
   color-scheme: light;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;

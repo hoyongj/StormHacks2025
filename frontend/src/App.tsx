@@ -108,7 +108,48 @@ function App() {
   const selectedPlan = plans.find((plan) => plan.id === selectedPlanId) ?? null;
   const selectedPlanStops = useMemo(() => selectedPlan?.stops ?? [], [selectedPlan]);
 
-  const handleCreateNew = async () => {
+  // Modal state for creating a new plan
+  const [showModal, setShowModal] = useState(false);
+  const [planName, setPlanName] = useState('');
+  const [editingName, setEditingName] = useState(false);
+  const [startPlace, setStartPlace] = useState('');
+  const [endPlace, setEndPlace] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [motivation, setMotivation] = useState<string[]>([]);
+  const [modalTouched, setModalTouched] = useState(false);
+
+  const TRIP_MOTIVATIONS = [
+    'Food',
+    'Museums',
+    'Music',
+    'Architecture',
+    'Nature',
+    'Shopping',
+    'Nightlife',
+    'Scenery',
+    'Relaxation',
+  ];
+
+  const isModalValid = startPlace.trim() && endPlace.trim() && motivation.length > 0;
+
+  const resetModal = () => {
+    setPlanName('');
+    setEditingName(false);
+    setStartPlace('');
+    setEndPlace('');
+    setStartDate('');
+    setEndDate('');
+    setMotivation([]);
+    setModalTouched(false);
+  };
+
+  const handleModalSave = async () => {
+    setModalTouched(true);
+    if (!isModalValid) return;
+    setShowModal(false);
+    resetModal();
+    // For now, just call the old handleCreateNew logic
     try {
       setIsLoading(true);
       const response = await fetch(`${API_BASE_URL}/generate-plan`, {
@@ -170,8 +211,105 @@ function App() {
     <div className="app">
       <header className="app__header">
         <h1>Pathfinder</h1>
-        <div className="app__profile">JH</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <button
+            type="button"
+            className="info__create"
+            onClick={() => setShowModal(true)}
+            disabled={isLoading}
+          >
+            Create New Plan
+          </button>
+          <div className="app__profile">JH</div>
+        </div>
       </header>
+
+      {showModal && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <div className="modal__title">
+              {editingName ? (
+                <input
+                  type="text"
+                  value={planName}
+                  onChange={e => setPlanName(e.target.value)}
+                  onBlur={() => setEditingName(false)}
+                  onKeyDown={e => { if (e.key === 'Enter') setEditingName(false); }}
+                  autoFocus
+                  className="modal__title-input"
+                  placeholder="Enter plan name..."
+                />
+              ) : (
+                <span className="modal__title-text" onClick={() => setEditingName(true)}>
+                  {planName || 'Untitled Plan'}
+                </span>
+              )}
+            </div>
+
+            <div className="modal__fields">
+              <div className="modal__row">
+                <label>Start:</label>
+                <input
+                  type="text"
+                  value={startPlace}
+                  onChange={e => setStartPlace(e.target.value)}
+                  placeholder="Start location..."
+                />
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={e => setStartDate(e.target.value)}
+                />
+              </div>
+              <div className="modal__row">
+                <label>End:</label>
+                <input
+                  type="text"
+                  value={endPlace}
+                  onChange={e => setEndPlace(e.target.value)}
+                  placeholder="End location..."
+                />
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={e => setEndDate(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="modal__motivation">
+              <p>Trip Motivation:</p>
+              <div className="modal__motivation-list">
+                {TRIP_MOTIVATIONS.map(option => (
+                  <button
+                    key={option}
+                    onClick={() => setMotivation(motivation.includes(option)
+                      ? motivation.filter(m => m !== option)
+                      : [...motivation, option])}
+                    className={`modal__motivation-btn ${motivation.includes(option) ? 'selected' : ''}`}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="modal__actions">
+              <button className="btn btn--secondary" onClick={() => { setShowModal(false); resetModal(); }}>
+                Cancel
+              </button>
+              <button className="btn btn--primary" onClick={handleModalSave} disabled={!isModalValid}>
+                Save Plan
+              </button>
+            </div>
+            {modalTouched && !isModalValid && (
+              <div style={{ color: 'red', marginTop: 8, fontSize: 13 }}>
+                Please fill in start, end, and select at least one motivation.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="app__layout">
         <aside className="app__summary">
@@ -192,7 +330,6 @@ function App() {
             <div className="app__to-go">
               <ToGoList
                 plan={selectedPlan}
-                onCreateNew={handleCreateNew}
                 isLoading={isLoading}
                 onSelectStop={handleStopSelected}
                 selectedStopLabel={selectedStop?.label}
