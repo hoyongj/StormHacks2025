@@ -66,6 +66,35 @@ export type TripAdvisorInfo = {
   longitude?: number;
 };
 
+export type RouteSegment = {
+  fromIndex: number;
+  toIndex: number;
+  mode: string;
+  durationText?: string;
+  distanceText?: string;
+  instructions?: string;
+  agency?: string;
+  lineName?: string;
+};
+
+type MapRouteResponse = {
+  plan_id: string;
+  polyline: string;
+  warnings: string[];
+  segments: RouteSegmentResponse[];
+};
+
+type RouteSegmentResponse = {
+  from_index: number;
+  to_index: number;
+  mode: string;
+  duration_text?: string;
+  distance_text?: string;
+  instructions?: string;
+  agency?: string;
+  line_name?: string;
+};
+
 type TripAdvisorResponsePayload = {
   info: {
     id: string;
@@ -102,6 +131,7 @@ function App() {
   const [advisorError, setAdvisorError] = useState<string | null>(null);
   const [advisorLoading, setAdvisorLoading] = useState<boolean>(false);
   const [selectedStopRef, setSelectedStopRef] = useState<{ planId: string; index: number } | null>(null);
+  const [routeSegments, setRouteSegments] = useState<RouteSegment[]>([]);
 
   const selectedPlan = plans.find((plan) => plan.id === selectedPlanId) ?? null;
   const selectedPlanStops = useMemo(() => selectedPlan?.stops ?? [], [selectedPlan]);
@@ -139,6 +169,7 @@ function App() {
         setSelectedStopRef(null);
         setAdvisorInfo(null);
         setAdvisorError(null);
+        setRouteSegments([]);
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unexpected error loading plans.');
@@ -149,6 +180,40 @@ function App() {
 
     loadPlans();
   }, []);
+
+  useEffect(() => {
+    if (!selectedPlan || selectedPlan.stops.length < 2) {
+      setRouteSegments([]);
+      return;
+    }
+
+    let cancelled = false;
+    const currentPlanId = selectedPlan.id;
+
+    async function loadRoute() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/plan/${currentPlanId}/route`);
+        if (!response.ok) {
+          throw new Error('Failed to load route details');
+        }
+        const payload: MapRouteResponse = await response.json();
+        const segments = (payload.segments ?? []).map(normalizeRouteSegment);
+        if (!cancelled) {
+          setRouteSegments(segments);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setRouteSegments([]);
+        }
+      }
+    }
+
+    loadRoute();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedPlan, selectedPlanId]);
 
   const [planName, setPlanName] = useState('');
   const [editingName, setEditingName] = useState(false);
@@ -365,6 +430,7 @@ function App() {
     setAdvisorInfo(null);
     setAdvisorError(null);
     setSelectedStopRef(null);
+    setRouteSegments([]);
   }, [selectedPlanId]);
 
   return (
@@ -480,8 +546,8 @@ function App() {
             onSelectPlan={setSelectedPlanId}
             onUpdatePlanTitle={handlePlanTitleChange}
             onUpdatePlanSummary={handlePlanSummaryChange}
-            onCreatePlan={handleCreateLocalPlan}
             onDeletePlan={handleDeletePlan}
+            routeSegments={routeSegments}
           />
         </aside>
 
@@ -561,6 +627,19 @@ function normalizeSuggestion(suggestion: TripAdvisorSuggestionPayload): TripAdvi
     priceLevel: suggestion.price_level,
     openNow: suggestion.open_now,
     types: suggestion.types ?? [],
+  };
+}
+
+function normalizeRouteSegment(segment: RouteSegmentResponse): RouteSegment {
+  return {
+    fromIndex: segment.from_index,
+    toIndex: segment.to_index,
+    mode: segment.mode,
+    durationText: segment.duration_text,
+    distanceText: segment.distance_text,
+    instructions: segment.instructions,
+    agency: segment.agency,
+    lineName: segment.line_name,
   };
 }
 

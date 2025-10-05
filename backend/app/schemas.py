@@ -50,6 +50,7 @@ class MapRoute(BaseModel):
     plan_id: str
     polyline: str = Field(..., description="Encoded polyline string returned by the maps provider.")
     warnings: List[str] = Field(default_factory=list)
+    segments: List['RouteSegment'] = Field(default_factory=list)
 
 
 class SuggestionOptions(BaseModel):
@@ -173,6 +174,17 @@ class PlanGenerationRequest(BaseModel):
 class PlanGenerationResponse(BaseModel):
     plan_id: str
     status: Literal["processing", "ready"]
+
+
+class RouteSegment(BaseModel):
+    from_index: int
+    to_index: int
+    mode: str
+    duration_text: Optional[str] = None
+    distance_text: Optional[str] = None
+    instructions: Optional[str] = None
+    agency: Optional[str] = None
+    line_name: Optional[str] = None
 
 
 class PlaceInfoRequest(BaseModel):
@@ -329,6 +341,9 @@ class TripSummaryInterface:
         raise NotImplementedError
 
 
+MapRoute.update_forward_refs(RouteSegment=RouteSegment)
+
+
 __all__ = [
     "AIChatbotInterface",
     "ChatMessage",
@@ -351,6 +366,7 @@ __all__ = [
     "PlanPreferences",
     "PlanReferences",
     "PlanStop",
+    "RouteSegment",
     "SegmentLeg",
     "SuggestionOptions",
     "TravelPlan",
