@@ -343,6 +343,13 @@ function App() {
   const [endDate, setEndDate] = useState('');
   const [motivation, setMotivation] = useState<string[]>([]);
   const [modalTouched, setModalTouched] = useState(false);
+  const [modalFolderId, setModalFolderId] = useState('all');
+
+  useEffect(() => {
+    if (!folders.some((folder) => folder.id === modalFolderId)) {
+      setModalFolderId('all');
+    }
+  }, [folders, modalFolderId]);
 
   const TRIP_MOTIVATIONS = [
     'Food',
@@ -367,6 +374,13 @@ function App() {
     setEndDate('');
     setMotivation([]);
     setModalTouched(false);
+    setModalFolderId('all');
+  };
+
+  const openCreatePlanModal = () => {
+    resetModal();
+    setModalFolderId(libraryFolderId);
+    setShowModal(true);
   };
 
   const createClientGeneratedId = () => {
@@ -687,35 +701,64 @@ function App() {
     );
   };
 
-  const handleModalSave = async () => {
+  const handleModalSave = () => {
     setModalTouched(true);
-    if (!isModalValid) return;
+    if (!isModalValid) {
+      return;
+    }
+
+    const targetFolderId = modalFolderId;
+    const trimmedName = planName.trim();
+    const trimmedStart = startPlace.trim();
+    const trimmedEnd = endPlace.trim();
+    const motivationSummary = motivation.join(', ');
+
+    const title =
+      trimmedName ||
+      (trimmedStart && trimmedEnd ? `${trimmedStart} → ${trimmedEnd}` : 'Untitled Plan');
+    const summary =
+      trimmedStart && trimmedEnd
+        ? `Journey from ${trimmedStart} to ${trimmedEnd}${motivationSummary ? ` with a focus on ${motivationSummary}.` : '.'}`
+        : 'Describe this adventure so it stands out in your library.';
+
+    const stops: PlanStop[] = [
+      {
+        label: trimmedStart,
+        description: startDate ? `Start on ${startDate}` : 'Starting point',
+      },
+      {
+        label: trimmedEnd,
+        description: endDate ? `Finish on ${endDate}` : 'Destination',
+      },
+    ];
+
+    const newPlan: TravelPlan = {
+      id: createClientGeneratedId(),
+      title,
+      summary,
+      stops,
+      createdAt: new Date().toISOString(),
+    };
+
+    setPlans((prev) => [newPlan, ...prev]);
+
+    if (targetFolderId && targetFolderId !== 'all') {
+      handleAssignPlanToFolder(targetFolderId, newPlan.id);
+      setLibraryFolderId(targetFolderId);
+    } else {
+      setLibraryFolderId('all');
+    }
+
+    setSelectedPlanId(newPlan.id);
+    setSelectedStopRef(null);
+    setAdvisorInfo(null);
+    setAdvisorError(null);
+    setRouteSegments([]);
+    setDraftPlan(clonePlan(newPlan));
+    setIsDraftDirty(false);
+    setError(null);
     setShowModal(false);
     resetModal();
-    // For now, just call the old handleCreateNew logic
-    try {
-      setIsLoading(true);
-      const response = await fetch(`${API_BASE_URL}/generate-plan`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: 'Plan a day exploring Burnaby around SFU.' }),
-      });
-      if (!response.ok) {
-        throw new Error('Failed to generate a new plan');
-      }
-      const planResponse: TravelPlanResponse = await response.json();
-      const plan = normalizePlan(planResponse);
-      setPlans((prev) => [plan, ...prev]);
-      setSelectedPlanId(plan.id);
-      setSelectedStopRef(null);
-      setAdvisorInfo(null);
-      setAdvisorError(null);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unexpected error creating a plan.');
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const handleStopSelected = (stop: PlanStop, stopIndex: number) => {
@@ -804,7 +847,7 @@ function App() {
             <button
               type="button"
               className="info__create"
-              onClick={() => setShowModal(true)}
+              onClick={openCreatePlanModal}
               disabled={isLoading}
             >
               Create New Plan
@@ -877,6 +920,23 @@ function App() {
                   onChange={e => setEndDate(e.target.value)}
                 />
               </div>
+              <div className="modal__row">
+                <label htmlFor="modal-folder-select">Save to:</label>
+                <select
+                  id="modal-folder-select"
+                  value={modalFolderId}
+                  onChange={(event) => setModalFolderId(event.target.value)}
+                >
+                  <option value="all">All plans (default)</option>
+                  {folders
+                    .filter((folder) => folder.id !== 'all')
+                    .map((folder) => (
+                      <option key={folder.id} value={folder.id}>
+                        {folder.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
             </div>
 
             <div className="modal__motivation">
@@ -900,7 +960,11 @@ function App() {
               <button className="btn btn--secondary" onClick={() => { setShowModal(false); resetModal(); }}>
                 Cancel
               </button>
-              <button className="btn btn--primary" onClick={handleModalSave} disabled={!isModalValid}>
+              <button
+                className="btn btn--primary"
+                onClick={handleModalSave}
+                disabled={!isModalValid || isLoading}
+              >
                 Save Plan
               </button>
             </div>

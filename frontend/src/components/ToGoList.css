@@ -456,7 +456,8 @@
 }
 
 .modal__row input[type='text'],
-.modal__row input[type='date'] {
+.modal__row input[type='date'],
+.modal__row select {
   flex: 1;
   padding: 0.4rem 0.6rem;
   border-radius: 8px;
