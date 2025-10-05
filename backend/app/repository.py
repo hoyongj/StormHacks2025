@@ -109,7 +109,7 @@ def list_plans() -> List[TravelPlan]:
                     title=title,
                     summary=summary,
                     stops=stops,
-                    created_at=datetime.fromisoformat(created_at),
+                    createdAt=datetime.fromisoformat(created_at),
                 )
             )
     return plans
@@ -128,7 +128,7 @@ def get_plan(plan_id: str) -> Optional[TravelPlan]:
             id=row[0],
             title=row[1],
             summary=row[2],
-            created_at=datetime.fromisoformat(row[3]),
+            createdAt=datetime.fromisoformat(row[3]),
             stops=stops,
         )
 
@@ -160,7 +160,7 @@ def seed_sample_plan() -> None:
         id="sample-sfu",
         title="Simon Fraser University Day",
         summary="Explore the Burnaby Mountain campus with study spots, coffee breaks, and scenic viewpoints.",
-        created_at=datetime.utcnow(),
+        createdAt=datetime.utcnow(),
         stops=[
             PlanStop(
                 label="Simon Fraser University",
