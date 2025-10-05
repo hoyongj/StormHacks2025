@@ -164,22 +164,16 @@ def seed_sample_plan() -> None:
         createdAt=datetime.utcnow(),
         stops=[
             PlanStop(
+                label="Burnaby Mountain Park Lookout",
+                description="Walk to the Kamui Mintara totems and catch the Burrard Inlet views.",
+                latitude=49.28314,
+                longitude=-122.93475,
+            ),
+            PlanStop(
                 label="Simon Fraser University",
                 description="Meet at the AQ and take in the Arthur Erickson architecture around Freedom Square.",
                 latitude=49.278093,
                 longitude=-122.919883,
-            ),
-            PlanStop(
-                label="Strand Hall Coffee",
-                description="Grab a latte before exploring the upper campus gardens.",
-                latitude=49.278986,
-                longitude=-122.917792,
-            ),
-            PlanStop(
-                label="Burnaby Mountain Park Lookout",
-                description="Walk to the Kamui Mintara totems and catch the Burrard Inlet views.",
-                latitude=49.280715,
-                longitude=-122.960502,
             ),
             PlanStop(
                 label="Convocation Mall",
@@ -187,6 +181,12 @@ def seed_sample_plan() -> None:
                 latitude=49.277055,
                 longitude=-122.9173,
             ),
+            PlanStop(
+                label="Steve Pokébar SFU",
+                description="Enjoy a fresh poke bowl before exploring the upper campus gardens.",
+                latitude=49.27790,
+                longitude=-122.91182,
+            )
         ],
     )
     save_plan(sample)
