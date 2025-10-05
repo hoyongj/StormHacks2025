@@ -41,13 +41,14 @@ type TravelPlanResponse = {
 
 type PlanStopResponse = {
   label: string;
-  description?: string;
-  placeId?: string;
-  latitude?: number;
-  longitude?: number;
-  timeToSpendDays?: number;
-  timeToSpendHours?: number;
-  timeToSpendMinutes?: number;
+  description?: string | null;
+  placeId?: string | null;
+  place_id?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  timeToSpendDays?: number | null;
+  timeToSpendHours?: number | null;
+  timeToSpendMinutes?: number | null;
 };
 
 export type TripAdvisorSuggestion = {
@@ -484,25 +485,46 @@ function App() {
     });
   };
 
-  const handleDraftSave = () => {
+  const handleDraftSave = async () => {
     if (!draftPlan) {
       return;
     }
-    const savedPlan = clonePlan(draftPlan);
-    setPlans((prev) => {
-      const index = prev.findIndex((plan) => plan.id === savedPlan.id);
-      if (index === -1) {
-        return [savedPlan, ...prev];
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/plan/${draftPlan.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(serializePlanForSave(draftPlan)),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save plan');
       }
-      const next = [...prev];
-      next[index] = savedPlan;
-      return next;
-    });
-    setRouteSegments([]);
-    setAdvisorInfo(null);
-    setAdvisorError(null);
-    setDraftPlan(savedPlan);
-    setIsDraftDirty(false);
+
+      const payload: TravelPlanResponse = await response.json();
+      const savedPlan = normalizePlan(payload);
+
+      setPlans((prev) => {
+        const index = prev.findIndex((plan) => plan.id === savedPlan.id);
+        if (index === -1) {
+          return [savedPlan, ...prev];
+        }
+        const next = [...prev];
+        next[index] = savedPlan;
+        return next;
+      });
+      setRouteSegments([]);
+      setAdvisorInfo(null);
+      setAdvisorError(null);
+      setDraftPlan(clonePlan(savedPlan));
+      setIsDraftDirty(false);
+      setError(null);
+    } catch (err) {
+      console.error('Failed to save plan updates', err);
+      setError('Unable to save plan changes. Please try again.');
+    }
   };
 
   const handleAddStop = (planId: string) => {
@@ -959,6 +981,26 @@ function App() {
   );
 }
 
+function serializePlanForSave(plan: TravelPlan) {
+  return {
+    id: plan.id,
+    title: plan.title,
+    summary: plan.summary,
+    createdAt: plan.createdAt,
+    stops: plan.stops.map(serializeStopForSave),
+  };
+}
+
+function serializeStopForSave(stop: PlanStop) {
+  return {
+    label: stop.label,
+    description: stop.description ?? '',
+    place_id: stop.placeId ?? null,
+    latitude: typeof stop.latitude === 'number' ? stop.latitude : null,
+    longitude: typeof stop.longitude === 'number' ? stop.longitude : null,
+  };
+}
+
 function clonePlan(plan: TravelPlan): TravelPlan {
   return {
     ...plan,
@@ -974,13 +1016,13 @@ function normalizePlan(plan: TravelPlanResponse): TravelPlan {
     createdAt: plan.createdAt,
     stops: plan.stops.map((stop) => ({
       label: stop.label,
-      description: stop.description,
-      placeId: stop.placeId,
-      latitude: stop.latitude,
-      longitude: stop.longitude,
-      timeToSpendDays: stop.timeToSpendDays,
-      timeToSpendHours: stop.timeToSpendHours,
-      timeToSpendMinutes: stop.timeToSpendMinutes,
+      description: stop.description ?? undefined,
+      placeId: stop.placeId ?? stop.place_id ?? undefined,
+      latitude: typeof stop.latitude === 'number' ? stop.latitude : undefined,
+      longitude: typeof stop.longitude === 'number' ? stop.longitude : undefined,
+      timeToSpendDays: typeof stop.timeToSpendDays === 'number' ? stop.timeToSpendDays : undefined,
+      timeToSpendHours: typeof stop.timeToSpendHours === 'number' ? stop.timeToSpendHours : undefined,
+      timeToSpendMinutes: typeof stop.timeToSpendMinutes === 'number' ? stop.timeToSpendMinutes : undefined,
     })),
   };
 }

@@ -61,6 +61,18 @@ async def list_plans_endpoint() -> SuggestionOptions:
     return SuggestionOptions(options=fetch_travel_plans())
 
 
+@app.put("/api/plan/{plan_id}", response_model=TravelPlan)
+async def update_plan(plan_id: str, plan: TravelPlan) -> TravelPlan:
+    if plan.id != plan_id:
+        raise HTTPException(status_code=400, detail="Plan ID mismatch")
+
+    save_plan(plan)
+    updated = get_plan(plan_id)
+    if not updated:
+        raise HTTPException(status_code=500, detail="Failed to persist plan")
+    return updated
+
+
 @app.get("/api/plan/{plan_id}/route", response_model=MapRoute)
 async def get_route(plan_id: str) -> MapRoute:
     plan = get_plan(plan_id)
