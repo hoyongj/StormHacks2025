@@ -9,11 +9,12 @@ type MapViewProps = {
 
 const DEFAULT_CENTER: google.maps.LatLngLiteral = { lat: 49.2796, lng: -122.9199 }; // Burnaby, BC
 const EMBEDDED_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+const MAPS_MAP_ID: string = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID || 'DEMO_MAP_ID';
 
 function MapView({ plan }: MapViewProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.Marker[]>([]);
+  const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
   const cacheRef = useRef(new Map<string, google.maps.LatLngLiteral>());
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
   const routeRef = useRef<google.maps.Polyline | null>(null);
@@ -72,7 +73,7 @@ function MapView({ plan }: MapViewProps) {
     if (!mapsKey) {
       return null;
     }
-    return new Loader({ apiKey: mapsKey, version: 'weekly', libraries: ['places'] });
+    return new Loader({ apiKey: mapsKey, version: 'weekly', libraries: ['places', 'marker'] });
   }, [mapsKey]);
 
   useEffect(() => {
@@ -90,13 +91,15 @@ function MapView({ plan }: MapViewProps) {
         }
 
         setMapError(null);
-        mapRef.current = new google.maps.Map(canvasRef.current, {
+        const options: google.maps.MapOptions = {
           center: DEFAULT_CENTER,
           zoom: 12,
           streetViewControl: false,
           fullscreenControl: false,
           mapTypeControl: false,
-        });
+        };
+        options.mapId = MAPS_MAP_ID;
+        mapRef.current = new google.maps.Map(canvasRef.current, options);
         infoWindowRef.current = new google.maps.InfoWindow();
       })
       .catch((error) => setMapError(error instanceof Error ? error.message : 'Failed to load Maps SDK'));
@@ -151,12 +154,7 @@ function MapView({ plan }: MapViewProps) {
 
             bounds.extend(result.position);
 
-            const marker = new google.maps.Marker({
-              position: result.position,
-              map,
-              label: `${index + 1}`,
-              title: result.label,
-            });
+            const marker = createMarker(map, result.position, result.label, index + 1);
 
             marker.addListener('click', () => {
               if (!infoWindowRef.current) {
@@ -177,7 +175,8 @@ function MapView({ plan }: MapViewProps) {
             map.setCenter(DEFAULT_CENTER);
             map.setZoom(11);
           } else if (markersRef.current.length === 1) {
-            map.setCenter(markersRef.current[0].getPosition() ?? DEFAULT_CENTER);
+            const singlePosition = getMarkerPosition(markersRef.current[0]) ?? DEFAULT_CENTER;
+            map.setCenter(singlePosition);
             map.setZoom(13);
           } else {
             map.fitBounds(bounds, 48);
@@ -223,7 +222,9 @@ function MapView({ plan }: MapViewProps) {
   );
 
   function clearMarkers() {
-    markersRef.current.forEach((marker) => marker.setMap(null));
+    markersRef.current.forEach((marker) => {
+      marker.map = null;
+    });
     markersRef.current = [];
     infoWindowRef.current?.close();
   }
@@ -360,4 +361,36 @@ function escapeHtml(value: string): string {
         return char;
     }
   });
+}
+
+function createMarkerContent(index: number): HTMLElement {
+  const element = document.createElement('div');
+  element.className = 'map__marker';
+  element.textContent = `${index}`;
+  return element;
+}
+
+function createMarker(
+  map: google.maps.Map,
+  position: google.maps.LatLngLiteral,
+  title: string,
+  index: number
+): google.maps.marker.AdvancedMarkerElement {
+  return new google.maps.marker.AdvancedMarkerElement({
+    position,
+    map,
+    title,
+    content: createMarkerContent(index),
+    gmpClickable: true,
+  });
+}
+
+function getMarkerPosition(
+  marker: google.maps.marker.AdvancedMarkerElement
+): google.maps.LatLngLiteral | google.maps.LatLng | null {
+  const position = marker.position;
+  if (!position) {
+    return null;
+  }
+  return position instanceof google.maps.LatLng ? position : (position as google.maps.LatLngLiteral);
 }
