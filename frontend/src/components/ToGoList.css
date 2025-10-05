@@ -293,6 +293,49 @@
   box-shadow: 0 0 0 3px rgba(127, 90, 240, 0.15);
 }
 
+.to-go__suggestions {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0.4rem 0;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+  border: 1px solid rgba(127, 90, 240, 0.18);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.to-go__suggestions li + li {
+  border-top: 1px solid rgba(127, 90, 240, 0.12);
+}
+
+.to-go__suggestion {
+  display: grid;
+  gap: 0.25rem;
+  width: 100%;
+  padding: 0.6rem 0.9rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.to-go__suggestion:hover,
+.to-go__suggestion:focus-visible {
+  background: rgba(127, 90, 240, 0.12);
+  outline: none;
+}
+
+.to-go__suggestion-primary {
+  font-weight: 600;
+  color: #1d2145;
+}
+
+.to-go__suggestion-secondary {
+  font-size: 0.8rem;
+  color: rgba(29, 33, 69, 0.65);
+}
+
 .to-go__field-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
