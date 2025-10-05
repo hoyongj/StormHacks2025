@@ -96,6 +96,17 @@ function InfoPanel({
                       {stop.latitude.toFixed(4)}, {stop.longitude.toFixed(4)}
                     </span>
                   ) : null}
+                  {typeof stop.timeToSpendDays === 'number' || typeof stop.timeToSpendHours === 'number' || typeof stop.timeToSpendMinutes === 'number' ? (
+                    <span className="info__stop-duration">
+                      {[
+                        stop.timeToSpendDays ? `${stop.timeToSpendDays}d` : null,
+                        stop.timeToSpendHours ? `${stop.timeToSpendHours}h` : null,
+                        stop.timeToSpendMinutes ? `${stop.timeToSpendMinutes}m` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' ') || '0m'}
+                    </span>
+                  ) : null}
                 </div>
               </li>
             ))
