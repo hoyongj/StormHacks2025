@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Dict
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from .dependencies import get_google_maps_api_key
+from .repository import get_plan, init_db, list_plans as fetch_travel_plans, save_plan
 from .schemas import MapRoute, PromptRequest, SuggestionOptions, TravelPlan
 from .services.gemini import GeminiClient
 from .services.maps import MapsClient
@@ -23,7 +23,8 @@ app.add_middleware(
 
 gemini_client = GeminiClient()
 maps_client = MapsClient(get_google_maps_api_key())
-_plan_store: Dict[str, TravelPlan] = {}
+
+init_db()
 
 
 @app.get("/api/health")
@@ -34,18 +35,18 @@ def health_check() -> dict[str, str]:
 @app.post("/api/generate-plan", response_model=TravelPlan)
 async def generate_plan(request: PromptRequest) -> TravelPlan:
     plan = await gemini_client.suggest_plan(request.prompt)
-    _plan_store[plan.id] = plan
+    save_plan(plan)
     return plan
 
 
 @app.get("/api/plans", response_model=SuggestionOptions)
-async def list_plans() -> SuggestionOptions:
-    return SuggestionOptions(options=list(_plan_store.values()))
+async def list_plans_endpoint() -> SuggestionOptions:
+    return SuggestionOptions(options=fetch_travel_plans())
 
 
 @app.get("/api/plan/{plan_id}/route", response_model=MapRoute)
 async def get_route(plan_id: str) -> MapRoute:
-    plan = _plan_store.get(plan_id)
+    plan = get_plan(plan_id)
     if not plan:
         raise HTTPException(status_code=404, detail="Plan not found")
 

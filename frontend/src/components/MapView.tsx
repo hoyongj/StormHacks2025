@@ -16,6 +16,8 @@ function MapView({ plan }: MapViewProps) {
   const markersRef = useRef<google.maps.Marker[]>([]);
   const cacheRef = useRef(new Map<string, google.maps.LatLngLiteral>());
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
+  const routeRef = useRef<google.maps.Polyline | null>(null);
+  const planIdRef = useRef<string | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapsKey, setMapsKey] = useState<string | null>(EMBEDDED_MAPS_KEY ?? null);
   const [isLoadingKey, setIsLoadingKey] = useState(!EMBEDDED_MAPS_KEY);
@@ -105,8 +107,11 @@ function MapView({ plan }: MapViewProps) {
   }, [loader]);
 
   useEffect(() => {
+    planIdRef.current = plan?.id ?? null;
+
     if (!plan) {
       clearMarkers();
+      clearRoute();
       return;
     }
 
@@ -177,6 +182,8 @@ function MapView({ plan }: MapViewProps) {
           } else {
             map.fitBounds(bounds, 48);
           }
+
+          loadRoute(plan.id, google);
         })
         .catch(() => {
           if (active) {
@@ -220,6 +227,41 @@ function MapView({ plan }: MapViewProps) {
     markersRef.current = [];
     infoWindowRef.current?.close();
   }
+
+  function clearRoute() {
+    routeRef.current?.setMap(null);
+    routeRef.current = null;
+  }
+
+  async function loadRoute(planId: string, google: typeof window.google) {
+    clearRoute();
+    try {
+      const response = await fetch(`/api/plan/${planId}/route`);
+      if (!response.ok) {
+        return;
+      }
+      const payload: { polyline: string } = await response.json();
+      if (!payload.polyline) {
+        return;
+      }
+      if (planIdRef.current !== planId) {
+        return;
+      }
+      const path = decodePolyline(payload.polyline);
+      if (!path.length || !mapRef.current) {
+        return;
+      }
+      routeRef.current = new google.maps.Polyline({
+        path,
+        strokeColor: '#1a3cff',
+        strokeOpacity: 0.85,
+        strokeWeight: 4,
+      });
+      routeRef.current.setMap(mapRef.current);
+    } catch (error) {
+      setMapError('Unable to draw the route right now.');
+    }
+  }
 }
 
 type GeocodeResult = {
@@ -229,12 +271,19 @@ type GeocodeResult = {
 };
 
 async function geocodeStop(
-  stop: Pick<PlanStop, 'label' | 'description' | 'placeId'>,
+  stop: Pick<PlanStop, 'label' | 'description' | 'placeId' | 'latitude' | 'longitude'>,
   geocoder: google.maps.Geocoder,
   cache: Map<string, google.maps.LatLngLiteral>
 ): Promise<GeocodeResult | null> {
-  const { label, description, placeId } = stop;
+  const { label, description, placeId, latitude, longitude } = stop;
   const cacheKey = placeId ?? label;
+
+  if (typeof latitude === 'number' && typeof longitude === 'number') {
+    const position = { lat: latitude, lng: longitude };
+    cache.set(cacheKey, position);
+    return { label, description, position };
+  }
+
   const cached = cache.get(cacheKey);
   if (cached) {
     return { label, description, position: cached };
@@ -258,6 +307,41 @@ async function geocodeStop(
 }
 
 export default MapView;
+
+function decodePolyline(encoded: string): google.maps.LatLngLiteral[] {
+  let index = 0;
+  const length = encoded.length;
+  const path: google.maps.LatLngLiteral[] = [];
+  let lat = 0;
+  let lng = 0;
+
+  while (index < length) {
+    let result = 0;
+    let shift = 0;
+    let byte: number;
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+    const deltaLat = result & 1 ? ~(result >> 1) : result >> 1;
+    lat += deltaLat;
+
+    result = 0;
+    shift = 0;
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+    const deltaLng = result & 1 ? ~(result >> 1) : result >> 1;
+    lng += deltaLng;
+
+    path.push({ lat: lat / 1e5, lng: lng / 1e5 });
+  }
+
+  return path;
+}
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>'"]/g, (char) => {

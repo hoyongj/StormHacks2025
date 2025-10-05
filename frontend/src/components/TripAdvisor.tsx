@@ -3,9 +3,10 @@ import './TripAdvisor.css';
 
 type TripAdvisorProps = {
   plan: TravelPlan | null;
+  isLoading: boolean;
 };
 
-function TripAdvisor({ plan }: TripAdvisorProps) {
+function TripAdvisor({ plan, isLoading }: TripAdvisorProps) {
   const stops = plan?.stops ?? [];
 
   return (
@@ -21,7 +22,9 @@ function TripAdvisor({ plan }: TripAdvisorProps) {
       </header>
 
       <ol className="advisor__list">
-        {stops.length ? (
+        {isLoading ? (
+          <li className="advisor__empty">Loading itinerary…</li>
+        ) : stops.length ? (
           stops.map((stop, index) => (
             <li key={stop.label + index} className="advisor__item">
               <span className="advisor__number">{index + 1}</span>
