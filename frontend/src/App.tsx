@@ -388,6 +388,50 @@ function App() {
     );
   };
 
+  type InsertStopOptions = {
+    index?: number;
+    select?: boolean;
+  };
+
+  const insertStopIntoDraft = (stop: PlanStop, options?: InsertStopOptions) => {
+    let insertedAt: number | null = null;
+    let planIdForUpdate: string | null = null;
+
+    setDraftPlan((prev) => {
+      if (!prev) {
+        return prev;
+      }
+      planIdForUpdate = prev.id;
+      const stops = [...prev.stops];
+      const targetIndex = Math.max(
+        0,
+        Math.min(options?.index ?? stops.length, stops.length)
+      );
+      insertedAt = targetIndex;
+      stops.splice(targetIndex, 0, stop);
+      setIsDraftDirty(true);
+      return { ...prev, stops };
+    });
+
+    if (planIdForUpdate !== null && insertedAt !== null) {
+      const planId = planIdForUpdate;
+      const insertionIndex = insertedAt;
+      setSelectedStopRef((current) => {
+        if (options?.select) {
+          return { planId, index: insertionIndex };
+        }
+        if (!current || current.planId !== planId) {
+          return current;
+        }
+        if (current.index >= insertionIndex) {
+          return { planId, index: current.index + 1 };
+        }
+        return current;
+      });
+      setRouteSegments([]);
+    }
+  };
+
   const handleDraftAddStop = () => {
     setDraftPlan((prev) => {
       if (!prev) {
@@ -405,45 +449,27 @@ function App() {
   };
 
   const handleAddSuggestionStop = (suggestion: TripAdvisorSuggestion) => {
-    let insertedAt: number | null = null;
-    let planIdForUpdate: string | null = null;
+    const planId = draftPlan?.id ?? null;
+    if (!planId) {
+      return;
+    }
 
-    setDraftPlan((prev) => {
-      if (!prev) {
-        return prev;
-      }
-      planIdForUpdate = prev.id;
-      const insertionIndex =
-        selectedStopRef && selectedStopRef.planId === prev.id
-          ? selectedStopRef.index + 1
-          : prev.stops.length;
+    const insertionIndex =
+      selectedStopRef && selectedStopRef.planId === planId
+        ? selectedStopRef.index + 1
+        : undefined;
 
-      insertedAt = insertionIndex;
-      const stops = [...prev.stops];
-      const newStop: PlanStop = {
+    insertStopIntoDraft(
+      {
         label: suggestion.name,
         description: suggestion.address ?? '',
-      };
-      stops.splice(insertionIndex, 0, newStop);
-      setIsDraftDirty(true);
-      return { ...prev, stops };
-    });
+      },
+      { index: insertionIndex, select: true }
+    );
+  };
 
-    if (planIdForUpdate !== null && insertedAt !== null) {
-      const planId = planIdForUpdate;
-      const insertionIndex = insertedAt;
-
-      setSelectedStopRef((current) => {
-        if (!current || current.planId !== planId) {
-          return current;
-        }
-        if (current.index >= insertionIndex) {
-          return { planId, index: current.index + 1 };
-        }
-        return current;
-      });
-      setRouteSegments([]);
-    }
+  const handleAssistantAddStop = (stop: PlanStop, options?: InsertStopOptions) => {
+    insertStopIntoDraft(stop, { ...options, select: options?.select ?? true });
   };
 
   const handleDraftUpdateStop = (stopIndex: number, updates: Partial<PlanStop>) => {
@@ -456,6 +482,59 @@ function App() {
       return { ...prev, stops };
     });
     setRouteSegments([]);
+  };
+
+  const handleDraftMoveStop = (fromIndex: number, toIndex: number) => {
+    let planIdForUpdate: string | null = null;
+    let normalizedFrom = fromIndex;
+    let normalizedTo = toIndex;
+
+    setDraftPlan((prev) => {
+      if (!prev) {
+        return prev;
+      }
+      const maxIndex = prev.stops.length - 1;
+      if (maxIndex < 0) {
+        return prev;
+      }
+      normalizedFrom = Math.max(0, Math.min(normalizedFrom, maxIndex));
+      normalizedTo = Math.max(0, Math.min(normalizedTo, maxIndex));
+      if (normalizedFrom === normalizedTo) {
+        return prev;
+      }
+      planIdForUpdate = prev.id;
+      const stops = [...prev.stops];
+      const [moved] = stops.splice(normalizedFrom, 1);
+      stops.splice(normalizedTo, 0, moved);
+      setIsDraftDirty(true);
+      return { ...prev, stops };
+    });
+
+    if (planIdForUpdate !== null) {
+      const planId = planIdForUpdate;
+      const sourceIndex = normalizedFrom;
+      const targetIndex = normalizedTo;
+
+      setSelectedStopRef((current) => {
+        if (!current || current.planId !== planId) {
+          return current;
+        }
+        if (current.index === sourceIndex) {
+          return { planId, index: targetIndex };
+        }
+        if (sourceIndex < targetIndex) {
+          if (current.index > sourceIndex && current.index <= targetIndex) {
+            return { planId, index: current.index - 1 };
+          }
+        } else if (sourceIndex > targetIndex) {
+          if (current.index >= targetIndex && current.index < sourceIndex) {
+            return { planId, index: current.index + 1 };
+          }
+        }
+        return current;
+      });
+      setRouteSegments([]);
+    }
   };
 
   const handleDraftRemoveStop = (stopIndex: number) => {
@@ -963,7 +1042,16 @@ function App() {
           </section>
 
           <aside className="app__assistant">
-            <AiAssistantPanel />
+            <AiAssistantPanel
+              planTitle={workingPlan?.title ?? null}
+              selectedStop={selectedStop}
+              selectedStopIndex={selectedStopIndex}
+              stops={draftPlan?.stops ?? workingPlanStops}
+              onAddStop={draftPlan ? handleAssistantAddStop : undefined}
+              onUpdateStop={draftPlan ? handleDraftUpdateStop : undefined}
+              onRemoveStop={draftPlan ? handleDraftRemoveStop : undefined}
+              onMoveStop={draftPlan ? handleDraftMoveStop : undefined}
+            />
           </aside>
         </div>
       ) : view === 'manager' ? (
