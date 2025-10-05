@@ -4,12 +4,15 @@ import './ToGoList.css';
 
 type ToGoListProps = {
   plan: TravelPlan | null;
+  draftStops?: PlanStop[] | null;
   isLoading?: boolean;
   onSelectStop?: (stop: PlanStop, index: number) => void;
   selectedStopIndex?: number | null;
   onAddStop?: () => void;
   onUpdateStop?: (index: number, updates: Partial<PlanStop>) => void;
   onRemoveStop?: (index: number) => void;
+  onSave?: () => void;
+  hasPendingChanges?: boolean;
 };
 
 const clampToRange = (value: number, min: number, max: number): number => {
@@ -44,30 +47,51 @@ const durationLabel = (stop: PlanStop): string | null => {
 
 function ToGoList({
   plan,
+  draftStops = null,
   isLoading = false,
   onSelectStop,
   selectedStopIndex = null,
   onAddStop,
   onUpdateStop,
   onRemoveStop,
+  onSave,
+  hasPendingChanges = false,
 }: ToGoListProps) {
-  const stops = plan?.stops ?? [];
+  const planStops = plan?.stops ?? [];
+  const formStops = draftStops ?? planStops;
+  const allStopsLength = Math.max(planStops.length, formStops.length);
   const hasPlan = Boolean(plan);
+  const isEditable = Boolean(onUpdateStop);
   const [expandedStops, setExpandedStops] = useState<Record<number, boolean>>({});
-  const previousCountRef = useRef(stops.length);
+  const previousCountRef = useRef(formStops.length);
 
   useEffect(() => {
     setExpandedStops({});
-    previousCountRef.current = stops.length;
+    previousCountRef.current = formStops.length;
   }, [plan?.id]);
 
   useEffect(() => {
-    if (stops.length > previousCountRef.current) {
-      const newIndex = stops.length - 1;
+    if (formStops.length > previousCountRef.current) {
+      const newIndex = formStops.length - 1;
       setExpandedStops((prev) => ({ ...prev, [newIndex]: true }));
     }
-    previousCountRef.current = stops.length;
-  }, [stops.length, stops]);
+    previousCountRef.current = formStops.length;
+  }, [formStops.length, formStops]);
+
+  const durationSummaries = useMemo(() => 
+    Array.from({ length: allStopsLength })
+      .map((_, index) => {
+        const savedStop = planStops[index] ?? null;
+        const draftStop = formStops[index] ?? null;
+        const displayStop = savedStop ?? draftStop;
+        return displayStop ? durationLabel(displayStop) : null;
+      }),
+    [allStopsLength, planStops, formStops],
+  );
+
+  const canSave = Boolean(isEditable && onSave && hasPendingChanges);
+  const showUnsavedBadge = Boolean(isEditable && hasPendingChanges);
+  const inputsDisabled = !isEditable;
 
   const toggleStopDetails = (index: number) => {
     setExpandedStops((prev) => ({ ...prev, [index]: !prev[index] }));
@@ -106,12 +130,15 @@ function ToGoList({
     field: 'timeToSpendDays' | 'timeToSpendHours' | 'timeToSpendMinutes',
     rawValue: string,
   ) => {
+    if (!isEditable) {
+      return;
+    }
     const parsed = Number(rawValue);
     if (Number.isNaN(parsed) || parsed < 0) {
       return;
     }
 
-    const stop = stops[index];
+    const stop = formStops[index];
     if (!stop) {
       return;
     }
@@ -126,6 +153,9 @@ function ToGoList({
   };
 
   const handleTimeClear = (index: number) => {
+    if (!isEditable) {
+      return;
+    }
     onUpdateStop?.(index, {
       timeToSpendDays: undefined,
       timeToSpendHours: undefined,
@@ -133,7 +163,44 @@ function ToGoList({
     });
   };
 
-  const durationSummaries = useMemo(() => stops.map(durationLabel), [stops]);
+  const handleSaveClick = () => {
+    if (!canSave) {
+      return;
+    }
+    onSave?.();
+  };
+
+  const handleAddStopClick = () => {
+    if (!isEditable || !onAddStop) {
+      return;
+    }
+    onAddStop();
+  };
+
+  const handleRemoveStopClick = (index: number) => {
+    if (!isEditable || !onRemoveStop) {
+      return;
+    }
+    onRemoveStop(index);
+    setExpandedStops((prev) => {
+      const next: Record<number, boolean> = {};
+      Object.entries(prev).forEach(([key, value]) => {
+        const currentIndex = Number(key);
+        if (currentIndex === index) {
+          return;
+        }
+        const newIndex = currentIndex > index ? currentIndex - 1 : currentIndex;
+        if (value) {
+          next[newIndex] = true;
+        }
+      });
+      return next;
+    });
+  };
+
+  const handleSelectStopClick = (stop: PlanStop, index: number) => {
+    onSelectStop?.(stop, index);
+  };
 
   return (
     <section className="to-go">
@@ -144,14 +211,20 @@ function ToGoList({
             <h3>{plan ? 'Upcoming stops' : 'Pick a plan to see your route'}</h3>
           </div>
           <div className="to-go__header-actions">
-            <button type="button" className="to-go__button" disabled={!hasPlan}>
+            {showUnsavedBadge ? <span className="to-go__draft-indicator">Unsaved changes</span> : null}
+            <button
+              type="button"
+              className="to-go__button"
+              onClick={handleSaveClick}
+              disabled={!canSave}
+            >
               Save
             </button>
             <button
               type="button"
               className="to-go__button to-go__button--secondary"
-              onClick={() => (hasPlan ? onAddStop?.() : null)}
-              disabled={!hasPlan}
+              onClick={handleAddStopClick}
+              disabled={!isEditable}
             >
               Add Stop
             </button>
@@ -162,11 +235,22 @@ function ToGoList({
       <ol className="to-go__list">
         {isLoading ? (
           <li className="to-go__empty">Loading your stops…</li>
-        ) : stops.length ? (
-          stops.map((stop, index) => {
+        ) : allStopsLength ? (
+          Array.from({ length: allStopsLength }).map((_, index) => {
+            const savedStop = planStops[index] ?? null;
+            const draftStop = formStops[index] ?? null;
+            if (!savedStop && !draftStop) {
+              return null;
+            }
+            const displayStop = savedStop ?? draftStop!;
+            const editableStop = draftStop ?? savedStop!;
             const isSelected = selectedStopIndex === index;
             const isExpanded = expandedStops[index] ?? false;
             const summary = durationSummaries[index];
+            const isNew = !savedStop && Boolean(draftStop);
+            const isRemoved = Boolean(savedStop && !draftStop);
+            const detailInputsDisabled = inputsDisabled || isRemoved;
+
             return (
               <li
                 key={`${plan?.id ?? 'plan'}-${index}`}
@@ -174,6 +258,8 @@ function ToGoList({
                   'to-go__item',
                   isSelected ? 'to-go__item--selected' : '',
                   isExpanded ? 'to-go__item--open' : '',
+                  isNew ? 'to-go__item--draft-new' : '',
+                  isRemoved ? 'to-go__item--draft-removed' : '',
                 ]
                   .filter(Boolean)
                   .join(' ')}
@@ -182,13 +268,15 @@ function ToGoList({
                   <button
                     type="button"
                     className="to-go__item-select"
-                    onClick={() => onSelectStop?.(stop, index)}
+                    onClick={() => handleSelectStopClick(editableStop, index)}
                     aria-pressed={isSelected}
                   >
                     <span className="to-go__step">{index + 1}</span>
                     <div className="to-go__item-text">
-                      <span className="to-go__title">{stop.label || 'Untitled stop'}</span>
+                      <span className="to-go__title">{displayStop.label || 'Untitled stop'}</span>
                       {summary ? <span className="to-go__time-pill">{summary}</span> : null}
+                      {isNew ? <span className="to-go__chip to-go__chip--new">New</span> : null}
+                      {isRemoved ? <span className="to-go__chip to-go__chip--removed">Removed</span> : null}
                     </div>
                   </button>
                   <div className="to-go__item-actions">
@@ -203,8 +291,8 @@ function ToGoList({
                     <button
                       type="button"
                       className="to-go__action to-go__action--danger"
-                      onClick={() => onRemoveStop?.(index)}
-                      disabled={!onRemoveStop}
+                      onClick={() => handleRemoveStopClick(index)}
+                      disabled={!isEditable || !onRemoveStop}
                     >
                       Remove
                     </button>
@@ -216,19 +304,21 @@ function ToGoList({
                     <span>Stop name</span>
                     <input
                       type="text"
-                      value={stop.label}
+                      value={editableStop.label}
                       onChange={(event) => handleLabelChange(index, event.target.value)}
                       placeholder="Enter stop name"
+                      disabled={detailInputsDisabled}
                     />
                   </label>
 
                   <label className="to-go__field">
                     <span>Notes</span>
                     <textarea
-                      value={stop.description ?? ''}
+                      value={editableStop.description ?? ''}
                       onChange={(event) => handleDescriptionChange(index, event.target.value)}
                       placeholder="Add optional notes"
                       rows={2}
+                      disabled={detailInputsDisabled}
                     />
                   </label>
 
@@ -236,9 +326,10 @@ function ToGoList({
                     <span>Place ID (optional)</span>
                     <input
                       type="text"
-                      value={stop.placeId ?? ''}
+                      value={editableStop.placeId ?? ''}
                       onChange={(event) => handlePlaceIdChange(index, event.target.value)}
                       placeholder="ChIJ..."
+                      disabled={detailInputsDisabled}
                     />
                   </label>
 
@@ -248,9 +339,10 @@ function ToGoList({
                       <input
                         type="number"
                         min="0"
-                        value={stop.timeToSpendDays ?? ''}
+                        value={editableStop.timeToSpendDays ?? ''}
                         onChange={(event) => handleTimePieceChange(index, 'timeToSpendDays', event.target.value)}
                         placeholder="0"
+                        disabled={detailInputsDisabled}
                       />
                     </label>
                     <label className="to-go__field to-go__field--compact">
@@ -259,9 +351,10 @@ function ToGoList({
                         type="number"
                         min="0"
                         max="23"
-                        value={stop.timeToSpendHours ?? ''}
+                        value={editableStop.timeToSpendHours ?? ''}
                         onChange={(event) => handleTimePieceChange(index, 'timeToSpendHours', event.target.value)}
                         placeholder="0"
+                        disabled={detailInputsDisabled}
                       />
                     </label>
                     <label className="to-go__field to-go__field--compact">
@@ -270,15 +363,17 @@ function ToGoList({
                         type="number"
                         min="0"
                         max="59"
-                        value={stop.timeToSpendMinutes ?? ''}
+                        value={editableStop.timeToSpendMinutes ?? ''}
                         onChange={(event) => handleTimePieceChange(index, 'timeToSpendMinutes', event.target.value)}
                         placeholder="0"
+                        disabled={detailInputsDisabled}
                       />
                     </label>
                     <button
                       type="button"
                       className="to-go__action to-go__action--ghost"
                       onClick={() => handleTimeClear(index)}
+                      disabled={detailInputsDisabled}
                     >
                       Clear time
                     </button>
@@ -290,9 +385,10 @@ function ToGoList({
                       <input
                         type="number"
                         step="any"
-                        value={stop.latitude ?? ''}
+                        value={editableStop.latitude ?? ''}
                         onChange={(event) => handleCoordinateChange(index, 'latitude', event.target.value)}
                         placeholder="49.2827"
+                        disabled={detailInputsDisabled}
                       />
                     </label>
                     <label className="to-go__field to-go__field--compact">
@@ -300,9 +396,10 @@ function ToGoList({
                       <input
                         type="number"
                         step="any"
-                        value={stop.longitude ?? ''}
+                        value={editableStop.longitude ?? ''}
                         onChange={(event) => handleCoordinateChange(index, 'longitude', event.target.value)}
                         placeholder="-123.1207"
+                        disabled={detailInputsDisabled}
                       />
                     </label>
                   </div>
@@ -316,8 +413,8 @@ function ToGoList({
             <button
               type="button"
               className="to-go__button to-go__button--secondary"
-              onClick={() => (hasPlan ? onAddStop?.() : null)}
-              disabled={!hasPlan}
+              onClick={handleAddStopClick}
+              disabled={!isEditable}
             >
               Add the first stop
             </button>

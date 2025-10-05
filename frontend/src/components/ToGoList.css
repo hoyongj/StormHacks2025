@@ -26,8 +26,14 @@
 
 .to-go__header-actions {
   display: flex;
-  gap: 0.6rem;
   align-items: center;
+  gap: 0.75rem;
+}
+
+.to-go__draft-indicator {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #e4385e;
 }
 
 .to-go__button {
@@ -158,6 +164,34 @@
   color: #4a3fa6;
   font-size: 0.75rem;
   font-weight: 600;
+}
+
+.to-go__item--draft-new {
+  border-style: dashed;
+}
+
+.to-go__item--draft-removed {
+  opacity: 0.6;
+  border-style: dashed;
+}
+
+.to-go__chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.to-go__chip--new {
+  background: rgba(44, 177, 188, 0.15);
+  color: #0b7285;
+}
+
+.to-go__chip--removed {
+  background: rgba(228, 56, 94, 0.15);
+  color: #a61e4d;
 }
 
 .to-go__item-actions {
@@ -324,6 +358,7 @@
   }
 }
 
+
 /* --- Modal Styling --- */
 .modal-overlay {
   position: fixed;
@@ -356,21 +391,13 @@
 
 .modal__title-input {
   font-size: 1.2rem;
-  padding: 0.4rem 0.8rem;
-  border-radius: 8px;
-  border: 1px solid #ccc;
-  width: 90%;
-  text-align: center;
-}
-
-.modal__title-text {
-  cursor: pointer;
-  color: #3b82f6;
+  padding: 0.6rem;
+  border-radius: 10px;
+  border: 1px solid rgba(127, 90, 240, 0.4);
 }
 
 .modal__fields {
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: 1rem;
 }
 
@@ -436,7 +463,6 @@
   gap: 0.8rem;
 }
 
-/* Buttons */
 .btn {
   padding: 0.6rem 1.2rem;
   border-radius: 8px;
@@ -463,7 +489,6 @@
   opacity: 0.9;
 }
 
-/* Animations */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -482,32 +507,4 @@
     transform: translateY(0);
     opacity: 1;
   }
-}
-
-@media (max-width: 1100px) {
-  .to-go {
-    height: auto;
-  }
-
-  .to-go__list li {
-    grid-template-columns: 28px 1fr;
-  }
-
-  .to-go__item-select {
-    grid-template-columns: 28px 1fr;
-  }
-
-  .to-go__step {
-    width: 28px;
-    height: 28px;
-  }
-}
-
-.to-go__item-select > div {
-  display: flex;
-  align-items: center;
-}
-
-.to-go__field-grid--coordinates {
-  margin-top: 0.45rem;
 }

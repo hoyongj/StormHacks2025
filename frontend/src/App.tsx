@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { startTransition, useEffect, useMemo, useRef, useState } from 'react';
 import MapView from './components/MapView';
 import InfoPanel from './components/InfoPanel';
 import TripAdvisor from './components/TripAdvisor';
@@ -162,25 +162,70 @@ function App() {
     bio: 'Train-hopping foodie who loves scenic detours.'
   });
 
-  const selectedPlan = plans.find((plan) => plan.id === selectedPlanId) ?? null;
-  const selectedPlanStops = useMemo(() => selectedPlan?.stops ?? [], [selectedPlan]);
+  const [draftPlan, setDraftPlan] = useState<TravelPlan | null>(null);
+  const [isDraftDirty, setIsDraftDirty] = useState(false);
+  const latestAdvisorRequest = useRef(0);
+
+  const selectedPlan = useMemo(
+    () => plans.find((plan) => plan.id === selectedPlanId) ?? null,
+    [plans, selectedPlanId],
+  );
+  const workingPlan = draftPlan ?? selectedPlan;
+  const workingPlanStops = useMemo(() => workingPlan?.stops ?? [], [workingPlan]);
 
   const selectedStop = useMemo(() => {
-    if (!selectedPlan || !selectedStopRef) {
+    if (!workingPlan || !selectedStopRef) {
       return null;
     }
-    if (selectedStopRef.planId !== selectedPlan.id) {
+    if (selectedStopRef.planId !== workingPlan.id) {
       return null;
     }
-    return selectedPlanStops[selectedStopRef.index] ?? null;
-  }, [selectedPlan, selectedPlanStops, selectedStopRef]);
+    return workingPlanStops[selectedStopRef.index] ?? null;
+  }, [workingPlan, workingPlanStops, selectedStopRef]);
 
   const selectedStopIndex = useMemo(() => {
-    if (!selectedPlan || !selectedStopRef) {
+    if (!workingPlan || !selectedStopRef) {
       return null;
     }
-    return selectedStopRef.planId === selectedPlan.id ? selectedStopRef.index : null;
-  }, [selectedPlan, selectedStopRef]);
+    return selectedStopRef.planId === workingPlan.id ? selectedStopRef.index : null;
+  }, [workingPlan, selectedStopRef]);
+
+  useEffect(() => {
+    if (!selectedPlan) {
+      if (draftPlan !== null) {
+        setDraftPlan(null);
+      }
+      setIsDraftDirty(false);
+      return;
+    }
+
+    if (draftPlan && draftPlan.id === selectedPlan.id) {
+      const metadataChanged =
+        draftPlan.title !== selectedPlan.title ||
+        draftPlan.summary !== selectedPlan.summary ||
+        draftPlan.createdAt !== selectedPlan.createdAt;
+
+      if (isDraftDirty) {
+        if (metadataChanged) {
+          setDraftPlan({
+            ...draftPlan,
+            title: selectedPlan.title,
+            summary: selectedPlan.summary,
+            createdAt: selectedPlan.createdAt,
+          });
+        }
+        return;
+      }
+
+      if (metadataChanged || draftPlan.stops.length !== selectedPlan.stops.length) {
+        setDraftPlan(clonePlan(selectedPlan));
+      }
+      return;
+    }
+
+    setDraftPlan(clonePlan(selectedPlan));
+    setIsDraftDirty(false);
+  }, [selectedPlan, draftPlan, isDraftDirty]);
 
   const [showModal, setShowModal] = useState(false);
 
@@ -335,6 +380,82 @@ function App() {
     );
   };
 
+  const handleDraftAddStop = () => {
+    setDraftPlan((prev) => {
+      if (!prev) {
+        return prev;
+      }
+      setIsDraftDirty(true);
+      const nextIndex = prev.stops.length + 1;
+      const newStop: PlanStop = {
+        label: `New Stop ${nextIndex}`,
+        description: '',
+      };
+      return { ...prev, stops: [...prev.stops, newStop] };
+    });
+    setRouteSegments([]);
+  };
+
+  const handleDraftUpdateStop = (stopIndex: number, updates: Partial<PlanStop>) => {
+    setDraftPlan((prev) => {
+      if (!prev) {
+        return prev;
+      }
+      setIsDraftDirty(true);
+      const stops = prev.stops.map((stop, index) => (index === stopIndex ? { ...stop, ...updates } : stop));
+      return { ...prev, stops };
+    });
+    setRouteSegments([]);
+  };
+
+  const handleDraftRemoveStop = (stopIndex: number) => {
+    if (!draftPlan) {
+      return;
+    }
+    const planId = draftPlan.id;
+    setDraftPlan((prev) => {
+      if (!prev) {
+        return prev;
+      }
+      setIsDraftDirty(true);
+      const stops = prev.stops.filter((_, index) => index !== stopIndex);
+      return { ...prev, stops };
+    });
+    setSelectedStopRef((current) => {
+      if (!current || current.planId !== planId) {
+        return current;
+      }
+      if (current.index === stopIndex) {
+        return null;
+      }
+      if (current.index > stopIndex) {
+        return { planId, index: current.index - 1 };
+      }
+      return current;
+    });
+  };
+
+  const handleDraftSave = () => {
+    if (!draftPlan) {
+      return;
+    }
+    const savedPlan = clonePlan(draftPlan);
+    setPlans((prev) => {
+      const index = prev.findIndex((plan) => plan.id === savedPlan.id);
+      if (index === -1) {
+        return [savedPlan, ...prev];
+      }
+      const next = [...prev];
+      next[index] = savedPlan;
+      return next;
+    });
+    setRouteSegments([]);
+    setAdvisorInfo(null);
+    setAdvisorError(null);
+    setDraftPlan(savedPlan);
+    setIsDraftDirty(false);
+  };
+
   const handleAddStop = (planId: string) => {
     setPlans((prev) =>
       prev.map((plan) => {
@@ -414,6 +535,8 @@ function App() {
     setSelectedStopRef(null);
     setAdvisorInfo(null);
     setAdvisorError(null);
+    setDraftPlan(clonePlan(newPlan));
+    setIsDraftDirty(false);
   };
 
   const handleCreateFolder = (name: string): string | null => {
@@ -511,41 +634,60 @@ function App() {
     }
   };
 
-  const handleStopSelected = async (stop: PlanStop, stopIndex: number) => {
-    if (!selectedPlan) {
+  const handleStopSelected = (stop: PlanStop, stopIndex: number) => {
+    if (!workingPlan) {
       return;
     }
-    setSelectedStopRef({ planId: selectedPlan.id, index: stopIndex });
+
+    startTransition(() => {
+      setSelectedStopRef({ planId: workingPlan.id, index: stopIndex });
+    });
+
+    const requestId = ++latestAdvisorRequest.current;
     setAdvisorLoading(true);
     setAdvisorError(null);
-    try {
-      const response = await fetch(`${API_BASE_URL}/tripadvisor`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: stop.label,
-          description: stop.description,
-          latitude: stop.latitude,
-          longitude: stop.longitude,
-          place_id: stop.placeId,
-        }),
-      });
-      if (!response.ok) {
-        throw new Error('Unable to fetch place details.');
+
+    const payload = {
+      name: stop.label,
+      description: stop.description,
+      latitude: stop.latitude,
+      longitude: stop.longitude,
+      place_id: stop.placeId,
+    };
+
+    void (async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/tripadvisor`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          throw new Error('Unable to fetch place details.');
+        }
+        const payloadData: TripAdvisorResponsePayload = await response.json();
+        if (latestAdvisorRequest.current === requestId) {
+          setAdvisorInfo(normalizeTripAdvisorInfo(payloadData.info));
+          setAdvisorError(null);
+        }
+      } catch (err) {
+        if (latestAdvisorRequest.current === requestId) {
+          setAdvisorError(err instanceof Error ? err.message : 'Unexpected error loading place details.');
+          setAdvisorInfo(null);
+        }
+      } finally {
+        if (latestAdvisorRequest.current === requestId) {
+          setAdvisorLoading(false);
+        }
       }
-      const payload: TripAdvisorResponsePayload = await response.json();
-      setAdvisorInfo(normalizeTripAdvisorInfo(payload.info));
-    } catch (err) {
-      setAdvisorError(err instanceof Error ? err.message : 'Unexpected error loading place details.');
-      setAdvisorInfo(null);
-    } finally {
-      setAdvisorLoading(false);
-    }
+    })();
   };
 
   useEffect(() => {
+    latestAdvisorRequest.current += 1;
     setAdvisorInfo(null);
     setAdvisorError(null);
+    setAdvisorLoading(false);
     setSelectedStopRef(null);
     setRouteSegments([]);
   }, [selectedPlanId]);
@@ -709,12 +851,15 @@ function App() {
               <div className="app__to-go">
                 <ToGoList
                   plan={selectedPlan}
+                  draftStops={draftPlan?.stops ?? null}
                   isLoading={isLoading}
                   onSelectStop={handleStopSelected}
                   selectedStopIndex={selectedStopIndex}
-                  onAddStop={selectedPlan ? () => handleAddStop(selectedPlan.id) : undefined}
-                  onUpdateStop={selectedPlan ? (index, updates) => handleUpdateStop(selectedPlan.id, index, updates) : undefined}
-                  onRemoveStop={selectedPlan ? (index) => handleRemoveStop(selectedPlan.id, index) : undefined}
+                  onAddStop={draftPlan ? handleDraftAddStop : undefined}
+                  onUpdateStop={draftPlan ? handleDraftUpdateStop : undefined}
+                  onRemoveStop={draftPlan ? handleDraftRemoveStop : undefined}
+                  onSave={draftPlan ? handleDraftSave : undefined}
+                  hasPendingChanges={isDraftDirty}
                 />
               </div>
             </div>
@@ -723,7 +868,7 @@ function App() {
               info={advisorInfo}
               isLoading={advisorLoading}
               error={advisorError}
-              stops={selectedPlanStops}
+              stops={selectedPlan?.stops ?? []}
             />
           </section>
 
@@ -744,6 +889,13 @@ function App() {
       )}
     </div>
   );
+}
+
+function clonePlan(plan: TravelPlan): TravelPlan {
+  return {
+    ...plan,
+    stops: plan.stops.map((stop) => ({ ...stop })),
+  };
 }
 
 function normalizePlan(plan: TravelPlanResponse): TravelPlan {
