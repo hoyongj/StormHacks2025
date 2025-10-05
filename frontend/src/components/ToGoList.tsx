@@ -13,11 +13,12 @@ function ToGoList({ plan, isLoading = false }: ToGoListProps) {
   return (
     <section className="to-go">
       <header className="to-go__header">
-        <div className="to-go__header-row">
+        <div className="to-go__header-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <p className="to-go__eyebrow">To Go</p>
             <h3>{plan ? 'Upcoming stops' : 'Pick a plan to see your route'}</h3>
           </div>
+          <button type="button" className="info__create">Save</button>
         </div>
       </header>
       <ol className="to-go__list">
