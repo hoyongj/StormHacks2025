@@ -23,6 +23,50 @@ type LocationSearchResult = {
   longitude: number;
 };
 
+const evaluateArithmetic = (raw: string): string | null => {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const lower = trimmed.toLowerCase();
+  const prefixes = ['what is', 'calculate', 'compute', 'solve', 'evaluate'];
+  let expression = lower;
+  for (const prefix of prefixes) {
+    if (expression.startsWith(prefix)) {
+      expression = expression.slice(prefix.length);
+      break;
+    }
+  }
+  expression = expression.replace(/^[^0-9\-+(]*?/i, '').trim();
+  expression = expression.replace(/[?!.]+$/g, '').trim();
+  if (!expression) {
+    return null;
+  }
+
+  const sanitized = expression
+    .replace(/\sx\s/gi, ' * ')
+    .replace(/[xX]/g, '*')
+    .replace(/\^/g, '**');
+
+  if (/[^0-9+\-*/().\s*]/.test(sanitized)) {
+    return null;
+  }
+
+  try {
+    // eslint-disable-next-line no-new-func
+    const result = Function(`"use strict"; return (${sanitized});`)();
+    if (typeof result === 'number' && Number.isFinite(result)) {
+      const formatted = Number.isInteger(result) ? `${result}` : result.toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
+      const cleanExpr = expression.replace(/\*\*/g, '^');
+      return `${cleanExpr} = ${formatted}`;
+    }
+  } catch (error) {
+    return null;
+  }
+  return null;
+};
+
 type AiAssistantPanelProps = {
   planTitle: string | null;
   stops: PlanStop[];
@@ -459,6 +503,35 @@ function AiAssistantPanel({
     attemptDescriptionUpdate,
   ];
 
+  const fetchAssistantReply = async (prompt: string): Promise<string | null> => {
+    try {
+      const context = historyRef.current
+        .slice(-6)
+        .map((entry) => ({
+          role: entry.role === 'assistant' ? 'assistant' : 'user',
+          content: entry.content,
+        }));
+
+      const response = await fetch(`${API_BASE_URL}/assistant/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: prompt, context }),
+      });
+
+      if (response.status === 204) {
+        return null;
+      }
+
+      const payload = await response.json().catch(() => ({}));
+      if (payload && typeof payload.reply === 'string' && payload.reply.trim().length) {
+        return payload.reply.trim();
+      }
+    } catch (error) {
+      // fall through to BC-specific fallback
+    }
+    return null;
+  };
+
   const processPrompt = async (prompt: string): Promise<string> => {
     for (const responder of responders) {
       // eslint-disable-next-line no-await-in-loop
@@ -466,6 +539,16 @@ function AiAssistantPanel({
       if (outcome) {
         return outcome;
       }
+    }
+
+    const mathAnswer = evaluateArithmetic(prompt);
+    if (mathAnswer) {
+      return `${mathAnswer}\n\nNeed help lining up British Columbia stops? Just let me know.`;
+    }
+
+    const remoteReply = await fetchAssistantReply(prompt);
+    if (remoteReply) {
+      return remoteReply;
     }
 
     return buildBcResponse(prompt, selectedStop, planTitle);
