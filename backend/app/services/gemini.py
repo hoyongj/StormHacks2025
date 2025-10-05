@@ -18,8 +18,8 @@ LOGGER = logging.getLogger(__name__)
 
 DEFAULT_MODEL_CANDIDATES = [
     os.getenv("GEMINI_MODEL_NAME"),
-    "gemini-2.5-flash-lite",
     "gemini-2.5-pro-latest",
+    "gemini-2.5-flash-lite",
     "gemini-2.5-flash",
     "gemini-pro",
 ]

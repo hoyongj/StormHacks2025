@@ -28,6 +28,7 @@ class MapsClient:
         self._last_warnings: List[str] = []
         self._last_payload: Optional[dict] = None
         self._geocode_cache: Dict[str, Tuple[float, float]] = {}
+        self._search_cache: Dict[str, Dict[str, object]] = {}
 
     async def build_route_polyline(self, stops: List[PlanStop]) -> str:
         """Return an encoded polyline for the ordered stops."""
@@ -122,6 +123,67 @@ class MapsClient:
 
         return enriched
 
+    async def search_location(self, query: str) -> Optional[Dict[str, object]]:
+        if not self.api_key:
+            return None
+
+        cleaned = (query or "").strip()
+        if not cleaned:
+            return None
+
+        cache_key = cleaned.lower()
+        cached = self._search_cache.get(cache_key)
+        if cached:
+            return cached
+
+        params = {
+            "address": cleaned,
+            "key": self.api_key,
+            "region": "ca",
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(GEOCODE_URL, params=params)
+            response.raise_for_status()
+            payload = response.json()
+        except Exception:
+            return None
+
+        if payload.get("status") != "OK":
+            return None
+
+        results = payload.get("results") or []
+        if not results:
+            return None
+
+        result = results[0]
+        if not self._is_bc_result(result):
+            return None
+
+        geometry = result.get("geometry", {}).get("location", {})
+        lat = geometry.get("lat")
+        lng = geometry.get("lng")
+        if not isinstance(lat, (int, float)) or not isinstance(lng, (int, float)):
+            return None
+
+        label = result.get("name") or result.get("formatted_address") or cleaned
+        address = result.get("formatted_address")
+        place_id = result.get("place_id")
+
+        location: Dict[str, object] = {
+            "label": label,
+            "address": address,
+            "place_id": place_id,
+            "latitude": float(lat),
+            "longitude": float(lng),
+        }
+
+        self._search_cache[cache_key] = location
+        key_for_cache = place_id or cache_key
+        self._geocode_cache[key_for_cache] = (float(lat), float(lng))
+        return location
+
     async def _request_directions(self, stops: List[PlanStop]) -> Optional[dict]:
         if not self.api_key or len(stops) < 2:
             return None
@@ -192,6 +254,19 @@ class MapsClient:
     def _geocode_cache_key(self, stop: PlanStop) -> str:
         token = stop.place_id or stop.description or stop.label
         return token or ""
+
+    @staticmethod
+    def _is_bc_result(result: dict) -> bool:
+        components = result.get("address_components", [])
+        for component in components:
+            types = component.get("types", [])
+            if "administrative_area_level_1" in types:
+                long_name = component.get("long_name", "")
+                short_name = component.get("short_name", "")
+                if "British Columbia" in long_name or short_name == "BC":
+                    return True
+        formatted_address = result.get("formatted_address", "")
+        return "British Columbia" in formatted_address or ", BC" in formatted_address
 
     def _format_waypoint(self, stop: PlanStop) -> str:
         if stop.place_id:

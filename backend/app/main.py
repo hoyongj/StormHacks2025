@@ -10,6 +10,8 @@ from .repository import get_plan, init_db, list_plans as fetch_travel_plans, sav
 from .schemas import (
     ChatRequest,
     ChatResponse,
+    LocationSearchRequest,
+    LocationSearchResult,
     MapRoute,
     PromptRequest,
     SuggestionOptions,
@@ -95,6 +97,14 @@ def get_maps_key() -> dict[str, str]:
     if not api_key:
         raise HTTPException(status_code=404, detail="Google Maps API key is not configured")
     return {"googleMapsApiKey": api_key}
+
+
+@app.post("/api/maps/search", response_model=LocationSearchResult)
+async def search_map_location(request: LocationSearchRequest) -> LocationSearchResult:
+    result = await maps_client.search_location(request.query)
+    if not result:
+        raise HTTPException(status_code=404, detail="No British Columbia location found for that query")
+    return LocationSearchResult(**result)
 
 
 @app.post("/api/tripadvisor", response_model=TripAdvisorResponse)

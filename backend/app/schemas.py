@@ -179,6 +179,18 @@ class PlanGenerationResponse(BaseModel):
     status: Literal["processing", "ready"]
 
 
+class LocationSearchRequest(BaseModel):
+    query: str = Field(..., min_length=2, max_length=200)
+
+
+class LocationSearchResult(BaseModel):
+    label: str
+    address: Optional[str] = None
+    place_id: Optional[str] = None
+    latitude: float
+    longitude: float
+
+
 class RouteSegment(BaseModel):
     from_index: int
     to_index: int

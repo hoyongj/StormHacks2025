@@ -2,6 +2,8 @@ import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react';
 import type { PlanStop } from '../App';
 import './AiAssistantPanel.css';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api';
+
 type Message = {
   id: string;
   role: 'user' | 'assistant';
@@ -11,6 +13,14 @@ type Message = {
 type AddStopOptions = {
   index?: number;
   select?: boolean;
+};
+
+type LocationSearchResult = {
+  label: string;
+  address?: string | null;
+  placeId?: string | null;
+  latitude: number;
+  longitude: number;
 };
 
 type AiAssistantPanelProps = {
@@ -225,7 +235,33 @@ function AiAssistantPanel({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const attemptAddStop = (prompt: string): string | null => {
+  const searchLocation = async (query: string): Promise<LocationSearchResult | null> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/maps/search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query }),
+      });
+      if (!response.ok) {
+        return null;
+      }
+      const payload = await response.json();
+      if (!payload || typeof payload.latitude !== 'number' || typeof payload.longitude !== 'number') {
+        return null;
+      }
+      return {
+        label: payload.label,
+        address: payload.address ?? undefined,
+        placeId: payload.place_id ?? undefined,
+        latitude: payload.latitude,
+        longitude: payload.longitude,
+      };
+    } catch (error) {
+      return null;
+    }
+  };
+
+  const attemptAddStop = async (prompt: string): Promise<string | null> => {
     if (!onAddStop) {
       return null;
     }
@@ -277,15 +313,22 @@ function AiAssistantPanel({
       }
     }
 
-    let label = stripPunctuation(remainder);
-    if (!label) {
+    const rawLabel = stripPunctuation(remainder);
+    if (!rawLabel) {
       return 'I need a name for that stop before I can add it.';
     }
-    label = titleCase(label);
+
+    const location = await searchLocation(rawLabel);
+    if (!location) {
+      return 'I can only add stops that I can place within British Columbia. Try a more specific BC location.';
+    }
 
     const stop: PlanStop = {
-      label,
-      description: '',
+      label: titleCase(location.label || rawLabel),
+      description: location.address ?? '',
+      placeId: location.placeId ?? undefined,
+      latitude: location.latitude,
+      longitude: location.longitude,
     };
 
     const targetIndex = insertionIndex ?? (
@@ -295,12 +338,16 @@ function AiAssistantPanel({
     onAddStop(stop, { index: targetIndex, select: true });
 
     if (targetIndex >= stops.length) {
-      return `Added ${label} to the end of the route.`;
+      const detail = location.address ? ` (${location.address})` : '';
+      return `Added ${stop.label}${detail} to the end of your route.`;
     }
-    return `Added ${label} at the ${toOrdinal(Math.max(0, Math.min(targetIndex, stops.length)))} spot.`;
+
+    const positionLabel = toOrdinal(Math.min(targetIndex, stops.length));
+    const detail = location.address ? ` (${location.address})` : '';
+    return `Inserted ${stop.label}${detail} at the ${positionLabel} stop.`;
   };
 
-  const attemptRemoveStop = (prompt: string): string | null => {
+  const attemptRemoveStop = async (prompt: string): Promise<string | null> => {
     if (!onRemoveStop) {
       return null;
     }
@@ -323,7 +370,7 @@ function AiAssistantPanel({
     return `Removed ${removed.label ?? `the ${toOrdinal(index)} stop`} from the plan.`;
   };
 
-  const attemptMoveStop = (prompt: string): string | null => {
+  const attemptMoveStop = async (prompt: string): Promise<string | null> => {
     if (!onMoveStop) {
       return null;
     }
@@ -355,7 +402,7 @@ function AiAssistantPanel({
     return `Moved ${stops[fromIndex].label ?? 'that stop'} to the ${toOrdinal(toIndex)} spot.`;
   };
 
-  const attemptRenameStop = (prompt: string): string | null => {
+  const attemptRenameStop = async (prompt: string): Promise<string | null> => {
     if (!onUpdateStop) {
       return null;
     }
@@ -380,7 +427,7 @@ function AiAssistantPanel({
     return `Renamed the ${toOrdinal(index)} stop to ${newLabel}.`;
   };
 
-  const attemptDescriptionUpdate = (prompt: string): string | null => {
+  const attemptDescriptionUpdate = async (prompt: string): Promise<string | null> => {
     if (!onUpdateStop) {
       return null;
     }
@@ -404,17 +451,18 @@ function AiAssistantPanel({
     return `Updated the description for ${stops[index].label ?? `the ${toOrdinal(index)} stop`}.`;
   };
 
-  const processPrompt = (prompt: string): string => {
-    const responders = [
-      attemptAddStop,
-      attemptRemoveStop,
-      attemptMoveStop,
-      attemptRenameStop,
-      attemptDescriptionUpdate,
-    ];
+  const responders: ((prompt: string) => Promise<string | null>)[] = [
+    attemptAddStop,
+    attemptRemoveStop,
+    attemptMoveStop,
+    attemptRenameStop,
+    attemptDescriptionUpdate,
+  ];
 
+  const processPrompt = async (prompt: string): Promise<string> => {
     for (const responder of responders) {
-      const outcome = responder(prompt);
+      // eslint-disable-next-line no-await-in-loop
+      const outcome = await responder(prompt);
       if (outcome) {
         return outcome;
       }
@@ -444,7 +492,7 @@ function AiAssistantPanel({
     setIsSending(true);
 
     try {
-      const reply = processPrompt(prompt);
+      const reply = await processPrompt(prompt);
       // Provide a short delay so the UI feels responsive but not instant.
       await new Promise((resolve) => setTimeout(resolve, 200));
 
@@ -467,13 +515,13 @@ function AiAssistantPanel({
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    sendPrompt(input);
+    void sendPrompt(input);
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
-      sendPrompt(input);
+      void sendPrompt(input);
     }
   };
 
@@ -481,7 +529,7 @@ function AiAssistantPanel({
     if (isSending) {
       return;
     }
-    sendPrompt(prompt);
+    void sendPrompt(prompt);
   };
 
   return (

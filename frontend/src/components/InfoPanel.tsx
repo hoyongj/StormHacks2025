@@ -72,6 +72,128 @@ function InfoPanel({
   }, [plans, activeFolder, selectedFolderId]);
 
   const folderLabel = activeFolder.name;
+
+  const handleGeneratePdf = async () => {
+    if (!plan) {
+      return;
+    }
+
+    try {
+      const escapeHtml = (value: string) =>
+        value.replace(/[&<>"]+/g, (match) => {
+          switch (match) {
+            case '&':
+              return '&amp;';
+            case '<':
+              return '&lt;';
+            case '>':
+              return '&gt;';
+            case '"':
+              return '&quot;';
+            default:
+              return match;
+          }
+        });
+
+      const title = plan.title || 'Trip Plan';
+      const summaryText = plan.summary || 'No summary provided.';
+
+      const stopsHtml = plan.stops
+        .map((stop, index) => {
+          const nextStop = plan.stops[index + 1];
+          const segment = routeSegments.find((item) => item.fromIndex === index);
+          const travelSummary = segment?.durationText
+            ? segment.distanceText
+              ? `${segment.durationText} • ${segment.distanceText}`
+              : segment.durationText
+            : nextStop
+            ? fallbackTravelEstimate(
+                stop.latitude,
+                stop.longitude,
+                nextStop.latitude,
+                nextStop.longitude
+              )
+            : null;
+          const connectorLabel =
+            segment?.lineName ||
+            segment?.agency ||
+            (segment?.mode ? formatModeLabel(segment.mode) : undefined);
+
+          const pieces: string[] = [];
+          pieces.push(`<h3>${escapeHtml(`${index + 1}. ${stop.label || 'Untitled stop'}`)}</h3>`);
+          if (stop.description) {
+            pieces.push(`<p>${escapeHtml(stop.description)}</p>`);
+          }
+          if (travelSummary) {
+            pieces.push(
+              `<p><strong>Travel:</strong> ${escapeHtml(connectorLabel || 'Transit')} • ${escapeHtml(
+                travelSummary
+              )}</p>`
+            );
+          }
+          if (segment?.instructions) {
+            pieces.push(`<p class="note">${escapeHtml(segment.instructions)}</p>`);
+          }
+          if (
+            typeof stop.latitude === 'number' &&
+            Number.isFinite(stop.latitude) &&
+            typeof stop.longitude === 'number' &&
+            Number.isFinite(stop.longitude)
+          ) {
+            pieces.push(
+              `<p class="coords">Coordinates: ${stop.latitude.toFixed(4)}, ${stop.longitude.toFixed(4)}</p>`
+            );
+          }
+          return `<section class="stop">${pieces.join('')}</section>`;
+        })
+        .join('');
+
+      const html = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>${escapeHtml(title)}</title>
+    <style>
+      body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 32px; color: #1f2237; }
+      h1 { font-size: 24px; margin-bottom: 8px; }
+      h2 { font-size: 18px; margin-top: 24px; }
+      p { line-height: 1.5; margin: 6px 0; }
+      .summary { margin-bottom: 18px; }
+      .stop { border-bottom: 1px solid #d5d8f0; padding: 12px 0; }
+      .stop:last-child { border-bottom: none; }
+      .stop h3 { margin: 0 0 6px; font-size: 16px; }
+      .note { font-style: italic; color: #3f4370; }
+      .coords { color: #3f4370; }
+    </style>
+  </head>
+  <body>
+    <h1>${escapeHtml(title)}</h1>
+    <section class="summary">
+      <h2>Overview</h2>
+      <p>${escapeHtml(summaryText)}</p>
+      <p><small>Updated ${new Date(plan.createdAt).toLocaleDateString()}</small></p>
+    </section>
+    <section>
+      <h2>Stops</h2>
+      ${stopsHtml || '<p>No stops yet.</p>'}
+    </section>
+  </body>
+</html>`;
+
+      const popup = window.open('', '_blank', 'width=900,height=700');
+      if (!popup) {
+        console.error('Unable to open a print window for PDF export.');
+        return;
+      }
+      popup.document.write(html);
+      popup.document.close();
+      popup.focus();
+      popup.print();
+    } catch (error) {
+      console.error('Failed to generate PDF', error);
+    }
+  };
+
   return (
     <div className="info">
       <header className="info__header">
@@ -105,13 +227,22 @@ function InfoPanel({
             <p className="info__meta">
               Updated {new Date(plan.createdAt).toLocaleDateString()}
             </p>
-            <button
-              type="button"
-              className="info__delete-plan"
-              onClick={() => onDeletePlan(plan.id)}
-            >
-              Delete Plan
-            </button>
+            <div className="info__summary-actions">
+              <button
+                type="button"
+                className="info__pdf-button"
+                onClick={handleGeneratePdf}
+              >
+                Download PDF
+              </button>
+              <button
+                type="button"
+                className="info__delete-plan"
+                onClick={() => onDeletePlan(plan.id)}
+              >
+                Delete Plan
+              </button>
+            </div>
           </>
         ) : (
           <p>Choose a plan to see its highlights and waypoints.</p>
