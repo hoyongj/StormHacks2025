@@ -8,7 +8,8 @@ type MapViewProps = {
 };
 
 const DEFAULT_CENTER: google.maps.LatLngLiteral = { lat: 49.2796, lng: -122.9199 }; // Burnaby, BC
-const MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+const EMBEDDED_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+console.log('[MapView] Embedded key present:', Boolean(EMBEDDED_MAPS_KEY));
 
 function MapView({ plan }: MapViewProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -17,13 +18,70 @@ function MapView({ plan }: MapViewProps) {
   const cacheRef = useRef(new Map<string, google.maps.LatLngLiteral>());
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
+  const [mapsKey, setMapsKey] = useState<string | null>(EMBEDDED_MAPS_KEY ?? null);
+  const [isLoadingKey, setIsLoadingKey] = useState(!EMBEDDED_MAPS_KEY);
+
+  useEffect(() => {
+    if (EMBEDDED_MAPS_KEY) {
+      setIsLoadingKey(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function fetchMapsKey() {
+      const baseUrl = window.location.origin;
+      const endpoint = `${baseUrl}/api/config/maps-key`;
+      console.log('[MapView] Fetching key from backend at', endpoint);
+      console.log('[MapView] Requesting key from backend…');
+      setIsLoadingKey(true);
+
+      try {
+        const response = await fetch(endpoint);
+        console.log('[MapView] Backend response status:', response.status);
+        if (!response.ok) {
+          throw new Error('Key not configured');
+        }
+        const payload: { googleMapsApiKey?: string } = await response.json();
+        console.log('[MapView] Backend payload received:', Object.keys(payload));
+        if (cancelled) {
+          return;
+        }
+        if (payload.googleMapsApiKey) {
+          setMapsKey(payload.googleMapsApiKey);
+          console.log('[MapView] Loaded key prefix:', payload.googleMapsApiKey.slice(0, 8));
+          setMapError(null);
+        } else {
+          console.log('[MapView] Payload missing googleMapsApiKey property');
+          setMapError('Google Maps API key is not configured.');
+        }
+      } catch (error) {
+        console.error('[MapView] Failed to load key from backend', error);
+        if (!cancelled) {
+          setMapError('Live map is unavailable because the Google Maps API key is not configured.');
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingKey(false);
+        }
+      }
+    }
+
+    fetchMapsKey();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const loader = useMemo(() => {
-    if (!MAPS_KEY) {
+    if (!mapsKey) {
+      console.log('[MapView] Maps loader waiting for key. Error?', mapError);
       return null;
     }
-    return new Loader({ apiKey: MAPS_KEY, version: 'weekly', libraries: ['places'] });
-  }, [MAPS_KEY]);
+    console.log('[MapView] Creating Google Maps loader with key prefix:', mapsKey.slice(0, 8));
+    return new Loader({ apiKey: mapsKey, version: 'weekly', libraries: ['places'] });
+  }, [mapsKey]);
 
   useEffect(() => {
     if (!canvasRef.current || !loader) {
@@ -142,11 +200,16 @@ function MapView({ plan }: MapViewProps) {
     };
   }, [plan, loader]);
 
-  if (!MAPS_KEY) {
+  if (!mapsKey) {
+    const message = mapError
+      ? mapError
+      : isLoadingKey
+        ? 'Loading map configuration…'
+        : 'Add `VITE_GOOGLE_MAPS_API_KEY` to your environment (or configure the backend) to enable the live map view.';
     return (
       <div className="map">
         <div className="map__message">
-          Add `VITE_GOOGLE_MAPS_API_KEY` to your environment to enable the live map view.
+          {message}
         </div>
       </div>
     );

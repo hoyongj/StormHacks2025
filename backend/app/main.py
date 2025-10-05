@@ -3,9 +3,12 @@ from __future__ import annotations
 import asyncio
 from typing import Dict
 
+import logging
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from .dependencies import get_google_maps_api_key
 from .schemas import MapRoute, PromptRequest, SuggestionOptions, TravelPlan
 from .services.gemini import GeminiClient
 from .services.maps import MapsClient
@@ -21,7 +24,9 @@ app.add_middleware(
 )
 
 gemini_client = GeminiClient()
-maps_client = MapsClient()
+logger = logging.getLogger(__name__)
+
+maps_client = MapsClient(get_google_maps_api_key())
 _plan_store: Dict[str, TravelPlan] = {}
 
 
@@ -50,6 +55,17 @@ async def get_route(plan_id: str) -> MapRoute:
 
     polyline = await maps_client.build_route_polyline(plan.stops)
     return MapRoute(plan_id=plan_id, polyline=polyline, warnings=[])
+
+
+@app.get("/api/config/maps-key")
+def get_maps_key() -> dict[str, str]:
+    api_key = maps_client.api_key
+    if not api_key:
+        logger.warning("/api/config/maps-key requested but key is missing")
+        raise HTTPException(status_code=404, detail="Google Maps API key is not configured")
+    logger.info("/api/config/maps-key served key prefix: %s", api_key[:8])
+    print(api_key)
+    return {"googleMapsApiKey": api_key}
 
 
 # Provide compatibility for uvicorn --factory

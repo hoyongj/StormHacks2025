@@ -8,7 +8,7 @@ services:
       - '8000:8000'
     environment:
       GEMINI_API_KEY: "${GEMINI_API_KEY:-demo}"
-      GOOGLE_MAPS_API_KEY: "${GOOGLE_MAPS_API_KEY:-demo}"
+      GOOGLE_MAPS_API_KEY: "${GOOGLE_MAPS_API_KEY:-${VITE_GOOGLE_MAPS_API_KEY:-}}"
     networks:
       - pathfinder
 
@@ -16,7 +16,7 @@ services:
     build:
       context: ./frontend
       args:
-        - VITE_GOOGLE_MAPS_API_KEY=${VITE_GOOGLE_MAPS_API_KEY:-${GOOGLE_MAPS_API_KEY:-demo}}
+        - VITE_GOOGLE_MAPS_API_KEY=${VITE_GOOGLE_MAPS_API_KEY:-${GOOGLE_MAPS_API_KEY:-}}
     container_name: pathfinder-frontend
     ports:
       - '5173:80'
