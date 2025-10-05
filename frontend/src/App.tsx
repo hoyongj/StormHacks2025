@@ -4,6 +4,7 @@ import InfoPanel from './components/InfoPanel';
 import TripAdvisor from './components/TripAdvisor';
 import AiAssistantPanel from './components/AiAssistantPanel';
 import ToGoList from './components/ToGoList';
+import PlanManager from './components/PlanManager';
 import './App.css';
 
 export type PlanStop = {
@@ -83,6 +84,12 @@ export type RouteSegment = {
   lineName?: string;
 };
 
+export type Folder = {
+  id: string;
+  name: string;
+  planIds: string[];
+};
+
 type MapRouteResponse = {
   plan_id: string;
   polyline: string;
@@ -138,6 +145,8 @@ function App() {
   const [advisorLoading, setAdvisorLoading] = useState<boolean>(false);
   const [selectedStopRef, setSelectedStopRef] = useState<{ planId: string; index: number } | null>(null);
   const [routeSegments, setRouteSegments] = useState<RouteSegment[]>([]);
+  const [view, setView] = useState<'planner' | 'manager'>('planner');
+  const [folders, setFolders] = useState<Folder[]>([{ id: 'all', name: 'All Plans', planIds: [] }]);
 
   const selectedPlan = plans.find((plan) => plan.id === selectedPlanId) ?? null;
   const selectedPlanStops = useMemo(() => selectedPlan?.stops ?? [], [selectedPlan]);
@@ -160,6 +169,12 @@ function App() {
   }, [selectedPlan, selectedStopRef]);
 
   const [showModal, setShowModal] = useState(false);
+
+  useEffect(() => {
+    if (view !== 'planner') {
+      setShowModal(false);
+    }
+  }, [view]);
 
   useEffect(() => {
     async function loadPlans() {
@@ -188,7 +203,39 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!selectedPlan || selectedPlan.stops.length < 2) {
+    setFolders((prev) => {
+      const planIds = plans.map((plan) => plan.id);
+      const validIds = new Set(planIds);
+
+      const byId = new Map<string, Folder>();
+      prev.forEach((folder) => {
+        byId.set(folder.id, {
+          ...folder,
+          planIds:
+            folder.id === 'all'
+              ? planIds
+              : folder.planIds.filter((id) => validIds.has(id)),
+        });
+      });
+
+      if (!byId.has('all')) {
+        byId.set('all', { id: 'all', name: 'All Plans', planIds });
+      } else {
+        byId.set('all', { id: 'all', name: 'All Plans', planIds });
+      }
+
+      const next = Array.from(byId.values());
+      next.sort((a, b) => {
+        if (a.id === 'all') return -1;
+        if (b.id === 'all') return 1;
+        return a.name.localeCompare(b.name);
+      });
+      return next;
+    });
+  }, [plans]);
+
+  useEffect(() => {
+    if (view !== 'planner' || !selectedPlan || selectedPlan.stops.length < 2) {
       setRouteSegments([]);
       return;
     }
@@ -219,7 +266,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [selectedPlan, selectedPlanId]);
+  }, [selectedPlan, selectedPlanId, view]);
 
   const [planName, setPlanName] = useState('');
   const [editingName, setEditingName] = useState(false);
@@ -355,6 +402,52 @@ function App() {
     setAdvisorError(null);
   };
 
+  const handleCreateFolder = (name: string): string | null => {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      return null;
+    }
+    const id = `folder-${createClientGeneratedId()}`;
+    setFolders((prev) => {
+      if (prev.some((folder) => folder.name.toLowerCase() === trimmed.toLowerCase())) {
+        return prev;
+      }
+      return [...prev, { id, name: trimmed, planIds: [] }];
+    });
+    return id;
+  };
+
+  const handleAssignPlanToFolder = (folderId: string, planId: string) => {
+    if (folderId === 'all') {
+      return;
+    }
+    setFolders((prev) =>
+      prev.map((folder) =>
+        folder.id === folderId
+          ? {
+              ...folder,
+              planIds: folder.planIds.includes(planId)
+                ? folder.planIds
+                : [...folder.planIds, planId],
+            }
+          : folder,
+      ),
+    );
+  };
+
+  const handleRemovePlanFromFolder = (folderId: string, planId: string) => {
+    if (folderId === 'all') {
+      return;
+    }
+    setFolders((prev) =>
+      prev.map((folder) =>
+        folder.id === folderId
+          ? { ...folder, planIds: folder.planIds.filter((id) => id !== planId) }
+          : folder,
+      ),
+    );
+  };
+
   const handleDeletePlan = (planId: string) => {
     setPlans((prev) => {
       const updated = prev.filter((plan) => plan.id !== planId);
@@ -443,20 +536,29 @@ function App() {
     <div className="app">
       <header className="app__header">
         <h1>Pathfinder</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div className="app__header-actions">
           <button
             type="button"
-            className="info__create"
-            onClick={() => setShowModal(true)}
-            disabled={isLoading}
+            className="app__nav-button"
+            onClick={() => setView((prev) => (prev === 'planner' ? 'manager' : 'planner'))}
           >
-            Create New Plan
+            {view === 'planner' ? 'Manage Plans' : 'Back to Planner'}
           </button>
+          {view === 'planner' ? (
+            <button
+              type="button"
+              className="info__create"
+              onClick={() => setShowModal(true)}
+              disabled={isLoading}
+            >
+              Create New Plan
+            </button>
+          ) : null}
           <div className="app__profile">JH</div>
         </div>
       </header>
 
-      {showModal && (
+      {view === 'planner' && showModal && (
         <div className="modal-overlay">
           <div className="modal">
             <div className="modal__title">
@@ -543,51 +645,61 @@ function App() {
         </div>
       )}
 
-      <div className="app__layout">
-        <aside className="app__summary">
-          <InfoPanel
-            plan={selectedPlan}
-            plans={plans}
-            selectedPlanId={selectedPlanId}
-            onSelectPlan={setSelectedPlanId}
-            onUpdatePlanTitle={handlePlanTitleChange}
-            onUpdatePlanSummary={handlePlanSummaryChange}
-            onDeletePlan={handleDeletePlan}
-            routeSegments={routeSegments}
-          />
-        </aside>
+      {view === 'planner' ? (
+        <div className="app__layout">
+          <aside className="app__summary">
+            <InfoPanel
+              plan={selectedPlan}
+              plans={plans}
+              selectedPlanId={selectedPlanId}
+              onSelectPlan={setSelectedPlanId}
+              onUpdatePlanTitle={handlePlanTitleChange}
+              onUpdatePlanSummary={handlePlanSummaryChange}
+              onDeletePlan={handleDeletePlan}
+              routeSegments={routeSegments}
+            />
+          </aside>
 
-        <section className="app__content">
-          {error ? <div className="app__error">{error}</div> : null}
-          <div className="app__primary">
-            <div className="app__map">
-              <MapView plan={selectedPlan} />
+          <section className="app__content">
+            {error ? <div className="app__error">{error}</div> : null}
+            <div className="app__primary">
+              <div className="app__map">
+                <MapView plan={selectedPlan} />
+              </div>
+              <div className="app__to-go">
+                <ToGoList
+                  plan={selectedPlan}
+                  isLoading={isLoading}
+                  onSelectStop={handleStopSelected}
+                  selectedStopIndex={selectedStopIndex}
+                  onAddStop={selectedPlan ? () => handleAddStop(selectedPlan.id) : undefined}
+                  onUpdateStop={selectedPlan ? (index, updates) => handleUpdateStop(selectedPlan.id, index, updates) : undefined}
+                  onRemoveStop={selectedPlan ? (index) => handleRemoveStop(selectedPlan.id, index) : undefined}
+                />
+              </div>
             </div>
-            <div className="app__to-go">
-              <ToGoList
-                plan={selectedPlan}
-                isLoading={isLoading}
-                onSelectStop={handleStopSelected}
-                selectedStopIndex={selectedStopIndex}
-                onAddStop={selectedPlan ? () => handleAddStop(selectedPlan.id) : undefined}
-                onUpdateStop={selectedPlan ? (index, updates) => handleUpdateStop(selectedPlan.id, index, updates) : undefined}
-                onRemoveStop={selectedPlan ? (index) => handleRemoveStop(selectedPlan.id, index) : undefined}
-              />
-            </div>
-          </div>
-          <TripAdvisor
-            selectedStop={selectedStop}
-            info={advisorInfo}
-            isLoading={advisorLoading}
-            error={advisorError}
-            stops={selectedPlanStops}
-          />
-        </section>
+            <TripAdvisor
+              selectedStop={selectedStop}
+              info={advisorInfo}
+              isLoading={advisorLoading}
+              error={advisorError}
+              stops={selectedPlanStops}
+            />
+          </section>
 
-        <aside className="app__assistant">
-          <AiAssistantPanel />
-        </aside>
-      </div>
+          <aside className="app__assistant">
+            <AiAssistantPanel />
+          </aside>
+        </div>
+      ) : (
+        <PlanManager
+          plans={plans}
+          folders={folders}
+          onCreateFolder={handleCreateFolder}
+          onAssignPlan={handleAssignPlanToFolder}
+          onRemovePlan={handleRemovePlanFromFolder}
+        />
+      )}
     </div>
   );
 }
