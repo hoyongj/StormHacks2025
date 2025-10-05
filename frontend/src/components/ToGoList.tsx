@@ -5,9 +5,10 @@ import './ToGoList.css';
 type ToGoListProps = {
   plan: TravelPlan | null;
   onCreateNew: () => void;
+  isLoading: boolean;
 };
 
-function ToGoList({ plan, onCreateNew }: ToGoListProps) {
+function ToGoList({ plan, onCreateNew, isLoading }: ToGoListProps) {
   const stops = plan?.stops ?? [];
 
   return (
@@ -18,13 +19,15 @@ function ToGoList({ plan, onCreateNew }: ToGoListProps) {
             <p className="to-go__eyebrow">To Go</p>
             <h3>{plan ? 'Upcoming stops' : 'Pick a plan to see your route'}</h3>
           </div>
-          <button type="button" className="info__create" onClick={onCreateNew}>
+          <button type="button" className="info__create" onClick={onCreateNew} disabled={isLoading}>
             Generate Plan
           </button>
         </div>
       </header>
       <ol className="to-go__list">
-        {stops.length ? (
+        {isLoading ? (
+          <li className="to-go__empty">Loading your stops…</li>
+        ) : stops.length ? (
           stops.map((stop, index) => (
             <li key={stop.label + index}>
               <span className="to-go__step">{index + 1}</span>
