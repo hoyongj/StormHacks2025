@@ -391,6 +391,7 @@ function ToGoList({
     return (
         <section className="to-go">
             <header className="to-go__header">
+
                 <div className="to-go__header-row">
                     <div>
                         <p className="to-go__eyebrow">To Go</p>
@@ -414,16 +415,16 @@ function ToGoList({
                         >
                             Save
                         </button>
-                        <button
-                            type="button"
-                            className="to-go__button to-go__button--secondary"
-                            onClick={handleAddStopClick}
-                            disabled={!isEditable}
-                        >
-                            Add Stop
-                        </button>
                     </div>
                 </div>
+                <button
+                    type="button"
+                    className="to-go__button to-go__button--secondary full-width"
+                    onClick={handleAddStopClick}
+                    disabled={!isEditable}
+                >
+                    Add Stop
+                </button>
             </header>
 
             <ol className="to-go__list">
@@ -508,8 +509,8 @@ function ToGoList({
                                             aria-expanded={isExpanded}
                                         >
                                             {isExpanded
-                                                ? "Hide details"
-                                                : "Show details"}
+                                                ? "Hide"
+                                                : "Details"}
                                         </button>
                                         <button
                                             type="button"
@@ -521,7 +522,7 @@ function ToGoList({
                                                 !isEditable || !onRemoveStop
                                             }
                                         >
-                                            Remove
+                                            -
                                         </button>
                                     </div>
                                 </div>
