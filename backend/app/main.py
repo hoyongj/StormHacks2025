@@ -33,7 +33,7 @@ app.add_middleware(
 
 gemini_client = GeminiClient()
 maps_client = MapsClient(get_google_maps_api_key())
-tripadvisor_service = TripAdvisorService()
+tripadvisor_service = TripAdvisorService(get_google_maps_api_key())
 
 init_db()
 
@@ -81,9 +81,7 @@ def get_maps_key() -> dict[str, str]:
 
 @app.post("/api/tripadvisor", response_model=TripAdvisorResponse)
 async def describe_place(request: TripAdvisorRequest) -> TripAdvisorResponse:
-    info = tripadvisor_service.describe_location(request)
-    if request.user_id:
-        tripadvisor_service.persist_last_viewed(request.user_id, info)
+    info = await tripadvisor_service.describe_location(request)
     return TripAdvisorResponse(info=info)
 
 

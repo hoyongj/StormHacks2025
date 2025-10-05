@@ -6,10 +6,6 @@ from typing import Iterable, List, Literal, Optional
 from pydantic import BaseModel, Field, HttpUrl
 
 # Prompt templates leveraged by assistant, map, and summary flows.
-CHATBOT_PROMPT: str = ""
-TRIPADVISOR_PROMPT: str = ""
-SUMMARY_PROMPT: str = ""
-
 
 class PlanStop(BaseModel):
     """Lightweight stop used by the legacy travel-plan endpoints."""
@@ -278,7 +274,7 @@ class MapInteractionInterface:
 class TripAdvisorInterface:
     """Surfaces nearby recommendations using Gemini for narrative context."""
 
-    def describe_location(self, request: TripAdvisorRequest) -> PlaceInfo:
+    async def describe_location(self, request: TripAdvisorRequest) -> PlaceInfo:
         """Build an enriched :class:`PlaceInfo` payload for the selected location."""
 
         raise NotImplementedError
