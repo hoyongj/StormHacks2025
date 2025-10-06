@@ -391,7 +391,6 @@ function ToGoList({
     return (
         <section className="to-go">
             <header className="to-go__header">
-
                 <div className="to-go__header-row">
                     <div>
                         <p className="to-go__eyebrow">To Go</p>
@@ -508,9 +507,7 @@ function ToGoList({
                                             }
                                             aria-expanded={isExpanded}
                                         >
-                                            {isExpanded
-                                                ? "Hide"
-                                                : "Details"}
+                                            {isExpanded ? "Hide" : "Details"}
                                         </button>
                                         <button
                                             type="button"
@@ -710,46 +707,27 @@ function ToGoList({
                                         </button>
                                     </div>
 
-                                    <div className="to-go__field-grid to-go__field-grid--coordinates">
-                                        <label className="to-go__field to-go__field--compact">
-                                            <span>Latitude</span>
+                                    <div className="to-go__field-grid to-go__field-grid--address">
+                                        <label className="to-go__field">
+                                            <span>Address</span>
                                             <input
-                                                type="number"
-                                                step="any"
+                                                type="text"
                                                 value={
-                                                    editableStop.latitude ?? ""
+                                                    editableStop.description ??
+                                                    ""
                                                 }
                                                 onChange={(event) =>
-                                                    handleCoordinateChange(
+                                                    handleDescriptionChange(
                                                         index,
-                                                        "latitude",
                                                         event.target.value
                                                     )
                                                 }
-                                                placeholder="49.2827"
-                                                disabled={detailInputsDisabled}
-                                            />
-                                        </label>
-                                        <label className="to-go__field to-go__field--compact">
-                                            <span>Longitude</span>
-                                            <input
-                                                type="number"
-                                                step="any"
-                                                value={
-                                                    editableStop.longitude ?? ""
-                                                }
-                                                onChange={(event) =>
-                                                    handleCoordinateChange(
-                                                        index,
-                                                        "longitude",
-                                                        event.target.value
-                                                    )
-                                                }
-                                                placeholder="-123.1207"
+                                                placeholder="123 Example St, Vancouver, BC"
                                                 disabled={detailInputsDisabled}
                                             />
                                         </label>
                                     </div>
+                                    {/* coordinates intentionally hidden from main UI */}
                                 </div>
                             </li>
                         );
