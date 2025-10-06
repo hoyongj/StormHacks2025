@@ -7,3 +7,4 @@ __pycache__
 *.pyc
 .DS_Store
 backend/travel_plans.db
+video_idea.md
