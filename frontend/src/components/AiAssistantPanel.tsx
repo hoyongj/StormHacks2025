@@ -301,6 +301,8 @@ function AiAssistantPanel({
     const [error, setError] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+    const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
     const historyRef = useRef<Message[]>([WELCOME_MESSAGE]);
 
     useEffect(() => {
@@ -700,6 +702,17 @@ function AiAssistantPanel({
             setError(message);
         } finally {
             setIsSending(false);
+            // keep focus on the textarea so the user can immediately type another message
+            // schedule focus after DOM updates to avoid races with re-renders
+            setTimeout(() => {
+                try {
+                    textareaRef.current?.focus();
+                    const len = textareaRef.current?.value?.length ?? 0;
+                    textareaRef.current?.setSelectionRange(len, len);
+                } catch (e) {
+                    // ignore focus failures
+                }
+            }, 0);
         }
     };
 
@@ -775,6 +788,7 @@ function AiAssistantPanel({
                     className="assistant__textarea"
                     placeholder="Ask for BC route ideas or tell me how to modify the stops."
                     value={input}
+                    ref={textareaRef}
                     onChange={(event) => setInput(event.target.value)}
                     onKeyDown={handleKeyDown}
                     disabled={isSending}
