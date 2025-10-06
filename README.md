@@ -1,95 +1,163 @@
-# Pathfinder Travel Advisor
+# 🗺️ Pathfinder Travel Advisor
 
-Collaborative travel planning platform built for StormHacks 2025. Pathfinder lets travelers describe the vibe of their day, receive curated stop suggestions with Gemini, and visualize the journey on an interactive map backed by Google Maps services.
+**Pathfinder** is a collaborative travel planning platform built for **StormHacks 2025**, designed to turn your trip ideas into structured day plans with AI-guided suggestions, visual routes, and integrated map previews.
 
-## Features
-- Guided prompt workflow to request food, scenery, and custom detours between major stops.
-- Plan history sidebar and info panel aligned with the initial wireframe for quick context switching.
-- FastAPI backend prepared for Google Gemini content generation and Google Maps route lookups.
-- Live Google Map embed that highlights generated stops once a key is configured.
-- Containerized React + Nginx frontend and Python backend orchestrated via `docker-compose`.
+Travelers describe the vibe of their day, receive curated stop recommendations powered by **Google Maps** and **Gemini**, and visualize their route instantly — all in one intuitive interface.
 
-## Project Structure
-```
-.
-├── backend          # FastAPI application
-│   ├── app
-│   │   ├── main.py
-│   │   ├── schemas.py
-│   │   └── services
-│   │       ├── gemini.py
-│   │       └── maps.py
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   └── .dockerignore
-├── frontend         # React + Vite single-page app
-│   ├── Dockerfile
-│   ├── index.html
-│   ├── nginx.conf
-│   ├── package.json
-│   ├── src
-│   │   ├── App.tsx
-│   │   └── components
-│   └── .dockerignore
-├── docker-compose.yml
-└── README.md
-```
+---
 
-## Local Development
+## 🌐 Live Demo (Frontend Only)
 
-### Backend
-1. Create and activate a virtual environment (optional but recommended).
-2. Install dependencies:
-   ```bash
-   pip install -r backend/requirements.txt
-   ```
-3. Start the API server:
-   ```bash
-   uvicorn app.main:app --reload --app-dir backend/app --host 0.0.0.0 --port 8000
-   ```
+You can explore the **Pathfinder Travel Advisor** web interface without setting up any backend services or API keys:
 
-### Frontend
-1. Install dependencies:
-   ```bash
-   cd frontend
-   npm install
-   ```
-2. Start the Vite dev server:
-   ```bash
-   npm run dev
-   ```
-3. Visit `http://localhost:5173`. The React client proxies API calls to `http://localhost:8000` when running locally.
+👉 **[Try the demo here](http://hoyongj.github.io/StormHacks2025)**
 
-> Tip: Vite reads environment variables prefixed with `VITE_`. Create `frontend/.env.local` with `VITE_GOOGLE_MAPS_API_KEY=...` (or export the variable in your shell) before running the dev server to unlock the interactive Google Map.
+## 🚀 Demo Preview
 
-## Docker Workflow
+### 🏠 Planner Dashboard
+Browse all your saved itineraries and create new ones.
 
-Ensure Docker Desktop (or compatible runtime) is running, then from the repository root execute:
+![Planner Dashboard](src/1B85E571-3581-4DB7-B3B6-4711D7806731.png)
+
+### 🗂️ Plan Library
+Easily access, organize, and manage your day plans by folder.
+
+![Plan Library](src/ABCAD2AB-7E52-47F5-BDBB-32F099A596DA.png)
+
+### 🧭 Active Plan View
+Each plan displays a Google Maps route connecting curated stops.
+- View and reorder stops dynamically
+- See detailed descriptions and estimated travel times
+
+![Active Plan](src/F9737645-BD80-40E2-A0D9-FA076F2ABC6C.png)
+![Today's Stops](src/9EA51966-BE47-4FD8-B504-D32FA592FB5C.png)
+
+### 💬 AI Travel Coach
+A built-in assistant helps modify your itinerary in natural language:
+- Add, remove, rename, or move stops
+- Request new destinations or BC-specific route ideas
+
+![Travel Coach](src/6E0E1E27-4194-43B1-A483-D86889764DDA.png)
+
+### 🧩 Stop Editor
+Quickly view or add new stops, check details, and save changes.
+
+![Upcoming Stops](src/8B86C042-0FFE-4BE5-A3D1-02AD661DBAE8.png)
+
+---
+
+## ✨ Features
+
+- 🌐 **Interactive Map** — See your route live with Google Maps integration  
+- 🧠 **AI Assistant** — Powered by Gemini for itinerary editing and suggestions  
+- 📅 **Dynamic Stops** — Add, rename, reorder, or delete travel stops easily  
+- 🧭 **Motivation Tags** — Personalize trips by mood (Food, Nature, Nightlife, etc.)  
+- 🗃️ **Plan Library** — Manage multiple itineraries with folder organization  
+- 🐳 **Dockerized Stack** — Simple setup using Docker Compose  
+- ⚙️ **Mock Mode** — Fully interactive UI even without API keys  
+
+---
+
+## 🧱 Tech Stack
+
+**Frontend**
+- React + Vite  
+- Google Maps Embed  
+
+**Backend**
+- Python (FastAPI)  
+- Google Gemini API  
+- Google Maps Directions API  
+
+**Infrastructure**
+- Docker Compose (React + Nginx + FastAPI)  
+- Environment-based API configuration  
+
+---
+
+## ⚙️ Setup
+
+### 1️⃣ Clone the Repository
 ```bash
-docker-compose up --build
-```
-This spins up:
-- `pathfinder-backend` on `http://localhost:8000`
-- `pathfinder-frontend` served by Nginx on `http://localhost:5173`
+git clone https://github.com/yourusername/pathfinder.git
+cd pathfinder
+````
 
-## Environment Variables
+### 2️⃣ Configure Environment Variables
 
-The stack expects Google credentials when you connect real services:
-- `GEMINI_API_KEY`
-- `GOOGLE_MAPS_API_KEY`
-- `VITE_GOOGLE_MAPS_API_KEY`
-
-Copy `.env.example` to `.env` in the project root and replace the placeholder values. The `.env` file is git-ignored and is automatically consumed by Docker Compose:
+Copy and edit `.env`:
 
 ```bash
 cp .env.example .env
-# then edit .env to insert your actual keys
 ```
 
-`VITE_GOOGLE_MAPS_API_KEY` is used at build time by the React app; point it to the same value as `GOOGLE_MAPS_API_KEY` unless you maintain separate public keys. You can also export the variables in your shell if you prefer. Without keys, the app falls back to deterministic mock data so the UI remains interactive, but the Google Map will display an overlay prompting you to add a key.
+Then add your real credentials:
 
-## Next Steps
-- Integrate official Google Gemini SDK and replace the mocked `GeminiClient` implementation.
-- Swap the mock route hashing with a Google Maps Directions API call and render polylines on the map canvas.
-- Persist plans in a database (e.g., Supabase, PostgreSQL) instead of the in-memory cache.
-- Wire in authentication for multi-user travel boards.
+```bash
+GEMINI_API_KEY=your_gemini_key
+GOOGLE_MAPS_API_KEY=your_google_maps_key
+VITE_GOOGLE_MAPS_API_KEY=your_google_maps_key
+```
+
+> 💡 If you don't set keys, Pathfinder runs in **mock mode**, showing static routes and demo data.
+
+### 3️⃣ Run with Docker
+
+```bash
+docker-compose up --build
+```
+
+Visit [http://localhost:5173](http://localhost:5173) once the build completes.
+
+---
+
+## 🧭 Usage Guide
+
+1. **Create a New Plan**
+
+   * Enter start and end locations
+   * Select trip motivations (Food, Nature, Shopping, etc.)
+
+2. **Customize Stops**
+
+   * Add or remove points of interest
+   * Drag to reorder stops on your itinerary
+
+3. **Ask the AI Travel Coach**
+
+   * Example prompts:
+
+     * “Add a stop for Brackendale Eagle Provincial Park after the current one.”
+     * “Rename stop 2 to Granville Island Market.”
+     * “Move stop 4 to position 2.”
+
+4. **View & Save Your Plan**
+
+   * See your updated route instantly
+   * Save for later access in the **Plan Library**
+
+---
+
+## 📸 Demo Flow Summary
+
+| Step | Screenshot                                                       | Description                                   |
+| ---- | ---------------------------------------------------------------- | --------------------------------------------- |
+| 1    | ![Create Plan](src/5FAE7D98-874A-4724-9A68-D96AB1172B21.png)  | Start a new plan with location and motivation |
+| 2    | ![Stops List](src/8B86C042-0FFE-4BE5-A3D1-02AD661DBAE8.png)   | View and manage stops                         |
+| 3    | ![Map Overview](src/F9737645-BD80-40E2-A0D9-FA076F2ABC6C.png) | Route visualization on Google Maps            |
+| 4    | ![AI Assistant](src/6E0E1E27-4194-43B1-A483-D86889764DDA.png) | AI assistant suggesting modifications         |
+| 5    | ![Plan Library](src/ABCAD2AB-7E52-47F5-BDBB-32F099A596DA.png) | Access and manage saved plans                 |
+
+---
+
+## 🧑‍💻 Authors
+
+Developed for **StormHacks 2025**
+by **Team Pathfinder**
+🌐 [GitHub Repo](https://github.com/hoyongj/StormHacks2025)
+
+---
+
+## 📄 License
+
+This project is released under the **MIT License**.
