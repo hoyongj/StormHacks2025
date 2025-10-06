@@ -300,6 +300,7 @@ function AiAssistantPanel({
     const [isSending, setIsSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
+    const messagesContainerRef = useRef<HTMLDivElement | null>(null);
     const historyRef = useRef<Message[]>([WELCOME_MESSAGE]);
 
     useEffect(() => {
@@ -307,7 +308,19 @@ function AiAssistantPanel({
     }, [messages]);
 
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        const container = messagesContainerRef.current;
+        if (!container) {
+            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            return;
+        }
+        try {
+            container.scrollTo({
+                top: container.scrollHeight,
+                behavior: "smooth",
+            });
+        } catch (e) {
+            container.scrollTop = container.scrollHeight;
+        }
     }, [messages]);
 
     const searchLocation = async (
@@ -738,7 +751,7 @@ function AiAssistantPanel({
                 </div>
             </div>
 
-            <div className="assistant__messages">
+            <div className="assistant__messages" ref={messagesContainerRef}>
                 {messages.map((message) => (
                     <div
                         key={message.id}
