@@ -1046,6 +1046,27 @@ function App() {
         setProfile((prev) => ({ ...prev, ...updates }));
     };
 
+    const handleUpdatePlanTitle = (planId: string, title: string) => {
+        setPlans((prev) =>
+            prev.map((p) => (p.id === planId ? { ...p, title } : p))
+        );
+        if (draftPlan && draftPlan.id === planId) {
+            setDraftPlan((prev) => (prev ? { ...prev, title } : prev));
+            setIsDraftDirty(true);
+        }
+    };
+
+    const handleUpdatePlanDate = (planId: string, isoDate: string) => {
+        const createdAt = new Date(isoDate).toISOString();
+        setPlans((prev) =>
+            prev.map((p) => (p.id === planId ? { ...p, createdAt } : p))
+        );
+        if (draftPlan && draftPlan.id === planId) {
+            setDraftPlan((prev) => (prev ? { ...prev, createdAt } : prev));
+            setIsDraftDirty(true);
+        }
+    };
+
     const handleDeletePlan = (planId: string) => {
         setPlans((prev) => {
             const updated = prev.filter((plan) => plan.id !== planId);
@@ -1406,6 +1427,9 @@ function App() {
                     onCreateFolder={handleCreateFolder}
                     onAssignPlan={handleAssignPlanToFolder}
                     onRemovePlan={handleRemovePlanFromFolder}
+                    onUpdatePlanTitle={handleUpdatePlanTitle}
+                    onUpdatePlanDate={handleUpdatePlanDate}
+                    onDeletePlan={handleDeletePlan}
                 />
             ) : (
                 <AdminPanel

@@ -8,6 +8,9 @@ type PlanManagerProps = {
     onCreateFolder: (name: string) => string | null;
     onAssignPlan: (folderId: string, planId: string) => void;
     onRemovePlan: (folderId: string, planId: string) => void;
+    onUpdatePlanTitle?: (planId: string, title: string) => void;
+    onUpdatePlanDate?: (planId: string, isoDate: string) => void;
+    onDeletePlan?: (planId: string) => void;
 };
 
 const PlanManager = ({
@@ -16,6 +19,9 @@ const PlanManager = ({
     onCreateFolder,
     onAssignPlan,
     onRemovePlan,
+    onUpdatePlanTitle,
+    onUpdatePlanDate,
+    onDeletePlan,
 }: PlanManagerProps) => {
     const [selectedFolderId, setSelectedFolderId] = useState<string>(
         folders[0]?.id ?? "all"
@@ -108,13 +114,16 @@ const PlanManager = ({
                             placeholder="Folder name"
                             className="manager__folder-input"
                             onKeyDown={(event) => {
-                                if (event.key === 'Enter' && newFolderName.trim()) {
+                                if (
+                                    event.key === "Enter" &&
+                                    newFolderName.trim()
+                                ) {
                                     event.preventDefault();
                                     submitNewFolder();
                                 }
-                                if (event.key === 'Escape') {
+                                if (event.key === "Escape") {
                                     setIsAddingFolder(false);
-                                    setNewFolderName('');
+                                    setNewFolderName("");
                                 }
                             }}
                         />
@@ -211,12 +220,48 @@ const PlanManager = ({
                                     className="manager__plan-card"
                                 >
                                     <header className="manager__plan-header">
-                                        <h3>{plan.title || "Untitled Plan"}</h3>
-                                        <span className="manager__plan-date">
-                                            {new Date(
-                                                plan.createdAt
-                                            ).toLocaleDateString()}
-                                        </span>
+                                        <div className="manager__plan-title-row">
+                                            <input
+                                                type="text"
+                                                className="manager__plan-title-input"
+                                                value={plan.title}
+                                                onChange={(e) =>
+                                                    onUpdatePlanTitle &&
+                                                    onUpdatePlanTitle(
+                                                        plan.id,
+                                                        e.target.value
+                                                    )
+                                                }
+                                                placeholder="Untitled Plan"
+                                            />
+                                            <button
+                                                type="button"
+                                                className="manager__plan-delete"
+                                                title="Delete plan"
+                                                onClick={() =>
+                                                    onDeletePlan &&
+                                                    onDeletePlan(plan.id)
+                                                }
+                                            >
+                                                -
+                                            </button>
+                                        </div>
+                                        <div className="manager__plan-date">
+                                            <input
+                                                type="date"
+                                                value={new Date(plan.createdAt)
+                                                    .toISOString()
+                                                    .slice(0, 10)}
+                                                onChange={(e) =>
+                                                    onUpdatePlanDate &&
+                                                    onUpdatePlanDate(
+                                                        plan.id,
+                                                        e.target.value
+                                                    )
+                                                }
+                                                className="manager__plan-date-input"
+                                            />
+                                        </div>
                                     </header>
                                     <p className="manager__plan-summary">
                                         {plan.summary ||
