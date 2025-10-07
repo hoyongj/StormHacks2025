@@ -740,11 +740,6 @@ function AiAssistantPanel({
             <div className="assistant__header">
                 <p className="assistant__eyebrow">AI Assist</p>
                 <h3>Travel Coach</h3>
-                <p>
-                    All suggestions stay within British Columbia. Ask for BC
-                    route ideas or tell me which stop to add, rename, move, or
-                    delete.
-                </p>
             </div>
 
             <div className="assistant__suggestions">

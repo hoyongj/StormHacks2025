@@ -18,6 +18,10 @@
     gap: 0.5rem;
 }
 
+.assistant__header h3 {
+    margin: 0;
+}
+
 .assistant__eyebrow {
     text-transform: uppercase;
     letter-spacing: 0.18em;
