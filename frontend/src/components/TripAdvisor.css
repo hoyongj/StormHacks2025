@@ -6,7 +6,10 @@
     display: flex;
     flex-direction: column;
     gap: 1.2rem;
-    min-height: 0;
+    min-height: 36vh;
+    height: 36vh;
+    max-height: 36vh;
+    overflow: hidden;
 }
 
 .advisor__header {
@@ -46,6 +49,10 @@
 .advisor__content {
     display: grid;
     gap: 1.4rem;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 0.25rem; /* breathing room for scrollbar */
 }
 
 .advisor__summary {
@@ -210,5 +217,18 @@
 @media (max-width: 900px) {
     .advisor {
         order: 3;
+    }
+}
+
+@media (max-width: 1100px) {
+    .advisor {
+        height: auto;
+        min-height: 0;
+        max-height: none;
+    }
+
+    .advisor__content {
+        overflow: visible;
+        padding-right: 0;
     }
 }

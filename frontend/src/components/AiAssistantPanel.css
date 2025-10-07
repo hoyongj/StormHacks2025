@@ -7,7 +7,9 @@
     flex-direction: column;
     gap: 1.25rem;
     /* allow the assistant to shrink inside a flex container and prevent it growing the page */
+    height: 100%;
     min-height: 0;
+    max-height: clamp(420px, 78vh, 820px);
     overflow: hidden;
 }
 
@@ -178,4 +180,10 @@
 
 .assistant__submit:not(:disabled):hover {
     transform: translateY(-1px);
+}
+
+@media (max-width: 1100px) {
+    .assistant {
+        max-height: none;
+    }
 }
