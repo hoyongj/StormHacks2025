@@ -178,8 +178,8 @@
 
 .to-go__item-header {
   padding: 0.85rem 1rem;
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 1rem;
 }
@@ -191,6 +191,10 @@
 }
 
 .to-go__step {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 32px;
   font-weight: 700;
   font-size: 1.1rem;
   color: #4a3fa6;
@@ -232,7 +236,8 @@
 }
 
 .to-go__item-select {
-  display: flex;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
   align-items: center;
   gap: 0.85rem;
   border: none;
@@ -241,6 +246,7 @@
   padding: 0;
   text-align: left;
   flex: 1;
+  width: 100%;
 }
 
 .to-go__title {
