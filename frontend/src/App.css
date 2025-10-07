@@ -119,7 +119,7 @@
         );
     gap: 2rem;
     padding: 1.75rem 2rem 2.5rem;
-    align-items: start;
+    align-items: stretch;
 }
 
 .app__summary {
@@ -130,8 +130,8 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
-    height: 48vh;
-    max-height: 48vh;
+    height: calc(48vh + 36vh + 1.5rem);
+    max-height: calc(48vh + 36vh + 1.5rem);
     overflow: hidden;
 }
 
@@ -205,11 +205,12 @@
 .app__assistant {
     display: flex;
     width: 100%;
-    align-self: start;
+    align-self: stretch;
     min-height: 0;
     /* constrain assistant column height so the panel can scroll internally */
     flex: 0 1 380px;
-    max-height: 80vh;
+    height: calc(48vh + 36vh + 1.5rem);
+    max-height: calc(48vh + 36vh + 1.5rem);
     box-sizing: border-box;
 }
 
@@ -435,6 +436,8 @@
 
     .app__assistant {
         order: 3;
+        height: auto;
+        max-height: none;
     }
 
     .app__map,
