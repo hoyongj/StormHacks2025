@@ -110,6 +110,29 @@ function ToGoList({
         [allStopsLength, planStops, formStops]
     );
 
+    const removedOriginalIndices = useMemo(() => {
+        if (!planStops.length) {
+            return new Set<number>();
+        }
+        const presentIndices = new Set<number>();
+        formStops.forEach((stop) => {
+            if (stop && typeof stop.__originalIndex === "number") {
+                presentIndices.add(stop.__originalIndex);
+            }
+        });
+        const removed = new Set<number>();
+        planStops.forEach((stop, index) => {
+            const originalIndex =
+                typeof stop.__originalIndex === "number"
+                    ? stop.__originalIndex
+                    : index;
+            if (!presentIndices.has(originalIndex)) {
+                removed.add(originalIndex);
+            }
+        });
+        return removed;
+    }, [planStops, formStops]);
+
     const predictionMap = useMemo(
         () => predictionStoreRef.current,
         [predictionTick]
@@ -436,13 +459,24 @@ function ToGoList({
                         if (!savedStop && !draftStop) {
                             return null;
                         }
+                        const originalIndex =
+                            savedStop && typeof savedStop.__originalIndex === "number"
+                                ? savedStop.__originalIndex
+                                : savedStop
+                                ? index
+                                : null;
+                        const isRemoved =
+                            typeof originalIndex === "number"
+                                ? removedOriginalIndices.has(originalIndex)
+                                : false;
                         const displayStop = savedStop ?? draftStop!;
-                        const editableStop = draftStop ?? savedStop!;
+                        const editableStop = isRemoved
+                            ? savedStop!
+                            : draftStop ?? savedStop!;
                         const isSelected = selectedStopIndex === index;
                         const isExpanded = expandedStops[index] ?? false;
                         const summary = durationSummaries[index];
                         const isNew = !savedStop && Boolean(draftStop);
-                        const isRemoved = Boolean(savedStop && !draftStop);
                         const detailInputsDisabled =
                             inputsDisabled || isRemoved;
 
@@ -465,6 +499,7 @@ function ToGoList({
                                     <button
                                         type="button"
                                         className="to-go__item-select"
+                                        disabled={isRemoved}
                                         onClick={() =>
                                             handleSelectStopClick(
                                                 editableStop,
@@ -505,6 +540,7 @@ function ToGoList({
                                             onClick={() =>
                                                 toggleStopDetails(index)
                                             }
+                                            disabled={isRemoved}
                                             aria-expanded={isExpanded}
                                         >
                                             {isExpanded ? "Hide" : "Details"}

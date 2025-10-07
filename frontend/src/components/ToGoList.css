@@ -238,8 +238,8 @@
 .to-go__item-select {
   display: grid;
   grid-template-columns: 32px minmax(0, 1fr);
-  align-items: start;
-  gap: 0.85rem;
+  align-items: center;
+  gap: 0.75rem;
   border: none;
   background: transparent;
   cursor: pointer;
@@ -252,7 +252,10 @@
 .to-go__title {
   font-weight: 600;
   color: #16192c;
-  word-break: break-word;
+  font-size: 1.02rem;
+  line-height: 1.35;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 
 .to-go__item-actions {

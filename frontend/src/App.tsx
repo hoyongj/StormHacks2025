@@ -24,6 +24,7 @@ export type PlanStop = {
     timeToSpendDays?: number;
     timeToSpendHours?: number;
     timeToSpendMinutes?: number;
+    __originalIndex?: number;
 };
 
 export type TravelPlan = {
@@ -1464,7 +1465,13 @@ function serializeStopForSave(stop: PlanStop) {
 function clonePlan(plan: TravelPlan): TravelPlan {
     return {
         ...plan,
-        stops: plan.stops.map((stop) => ({ ...stop })),
+        stops: plan.stops.map((stop, index) => ({
+            ...stop,
+            __originalIndex:
+                typeof stop.__originalIndex === "number"
+                    ? stop.__originalIndex
+                    : index,
+        })),
     };
 }
 
@@ -1474,7 +1481,7 @@ function normalizePlan(plan: TravelPlanResponse): TravelPlan {
         title: plan.title,
         summary: plan.summary,
         createdAt: plan.createdAt,
-        stops: plan.stops.map((stop) => ({
+        stops: plan.stops.map((stop, index) => ({
             label: stop.label,
             description: stop.description ?? undefined,
             placeId: stop.placeId ?? stop.place_id ?? undefined,
@@ -1494,6 +1501,7 @@ function normalizePlan(plan: TravelPlanResponse): TravelPlan {
                 typeof stop.timeToSpendMinutes === "number"
                     ? stop.timeToSpendMinutes
                     : undefined,
+            __originalIndex: index,
         })),
     };
 }
