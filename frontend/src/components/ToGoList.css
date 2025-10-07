@@ -191,17 +191,9 @@
 }
 
 .to-go__step {
-  width: 40px;
-  height: 40px;
-  border-radius: 14px;
-  background: #ffffff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   font-weight: 700;
   font-size: 1.1rem;
   color: #4a3fa6;
-  box-shadow: inset 0 0 0 1px rgba(127, 90, 240, 0.12);
   flex-shrink: 0;
 }
 
