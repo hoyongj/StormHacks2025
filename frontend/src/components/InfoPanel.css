@@ -139,10 +139,6 @@
 
 .info__section--stops {
   gap: 1rem;
-  grid-template-rows: auto 1fr;
-  max-height: clamp(320px, 60vh, 640px);
-  min-height: 0;
-  overflow: hidden;
 }
 
 .info__stops {
@@ -151,9 +147,6 @@
   padding: 0;
   display: grid;
   gap: 0.5rem;
-  overflow-y: auto;
-  padding-right: 0.25rem;
-  min-height: 0;
 }
 
 .info__stop-card {
@@ -316,10 +309,7 @@
 }
 
 .info__section--history {
-  grid-template-rows: auto 1fr;
-  max-height: clamp(320px, 60vh, 640px);
-  min-height: 0;
-  overflow: hidden;
+  gap: 1rem;
 }
 
 .info__folder-filter {
@@ -338,12 +328,6 @@
   font-size: 0.85rem;
   background: #f5f7ff;
   color: #2d2f44;
-}
-
-.info__plans--scroll {
-  overflow-y: auto;
-  padding-right: 0.25rem;
-  min-height: 0;
 }
 
 .info__plans--scroll::-webkit-scrollbar {
@@ -371,19 +355,6 @@
   color: #0b7285;
   font-size: 0.7rem;
   font-weight: 600;
-}
-
-@media (max-width: 1100px) {
-  .info__section--stops,
-  .info__section--history {
-    max-height: none;
-  }
-
-  .info__stops,
-  .info__plans--scroll {
-    overflow: visible;
-    padding-right: 0;
-  }
 }
 
 .info__plan-tag--empty {
