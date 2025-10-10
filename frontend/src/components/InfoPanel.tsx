@@ -101,13 +101,18 @@ function InfoPanel({
             const stopsHtml = plan.stops
                 .map((stop, index) => {
                     const nextStop = plan.stops[index + 1];
-                    const segment = routeSegments.find(
-                        (item) => item.fromIndex === index
-                    );
-                    const travelSummary = segment?.durationText
-                        ? segment.distanceText
-                            ? `${segment.durationText} • ${segment.distanceText}`
-                            : segment.durationText
+                    const segmentsForStop = routeSegments
+                        .filter((item) => item.fromIndex === index)
+                        .sort((a, b) => a.toIndex - b.toIndex);
+                    const primarySegment = segmentsForStop[0];
+                    const connectorLabel = segmentsForStop.length
+                        ? buildOverallPathLabel(segmentsForStop) ||
+                          (primarySegment?.mode
+                              ? formatModeLabel(primarySegment.mode)
+                              : undefined)
+                        : undefined;
+                    const travelSummary = segmentsForStop.length
+                        ? buildTotalSummary(segmentsForStop)
                         : nextStop
                         ? fallbackTravelEstimate(
                               stop.latitude,
@@ -116,12 +121,6 @@ function InfoPanel({
                               nextStop.longitude
                           )
                         : null;
-                    const connectorLabel =
-                        segment?.lineName ||
-                        segment?.agency ||
-                        (segment?.mode
-                            ? formatModeLabel(segment.mode)
-                            : undefined);
 
                     const pieces: string[] = [];
                     pieces.push(
@@ -139,13 +138,7 @@ function InfoPanel({
                             )} • ${escapeHtml(travelSummary)}</p>`
                         );
                     }
-                    if (segment?.instructions) {
-                        pieces.push(
-                            `<p class="note">${escapeHtml(
-                                segment.instructions
-                            )}</p>`
-                        );
-                    }
+                    // Simplified: no per-segment instructions in PDF
                     if (
                         typeof stop.latitude === "number" &&
                         Number.isFinite(stop.latitude) &&
@@ -280,8 +273,14 @@ function InfoPanel({
                                 .filter((item) => item.fromIndex === index)
                                 .sort((a, b) => a.toIndex - b.toIndex);
                             const primarySegment = segmentsForStop[0];
+                            const overallLabel = segmentsForStop.length
+                                ? buildOverallPathLabel(segmentsForStop) ||
+                                  (primarySegment?.mode
+                                      ? formatModeLabel(primarySegment.mode)
+                                      : undefined)
+                                : undefined;
                             const travelSummary = segmentsForStop.length
-                                ? buildTravelSummary(segmentsForStop)
+                                ? buildTotalSummary(segmentsForStop)
                                 : nextStop
                                 ? fallbackTravelEstimate(
                                       stop.latitude,
@@ -290,12 +289,7 @@ function InfoPanel({
                                       nextStop.longitude
                                   )
                                 : null;
-                            const connectorLabel =
-                                primarySegment?.lineName ||
-                                primarySegment?.agency ||
-                                (primarySegment?.mode
-                                    ? formatModeLabel(primarySegment.mode)
-                                    : undefined);
+                            const connectorLabel = overallLabel;
                             const connectorIconText = (
                                 primarySegment?.mode || "TRANSIT"
                             ).slice(0, 1);
@@ -336,59 +330,8 @@ function InfoPanel({
                                                     <span className="info__connector-metrics">
                                                         {travelSummary}
                                                     </span>
-                                                    {segmentsForStop.length >
-                                                    1 ? (
-                                                        <ul className="info__connector-steps">
-                                                            {segmentsForStop.map(
-                                                                (
-                                                                    item,
-                                                                    stepIndex
-                                                                ) => (
-                                                                    <li
-                                                                        key={`${item.fromIndex}-${item.toIndex}-${stepIndex}`}
-                                                                        className="info__connector-step"
-                                                                    >
-                                                                        <span className="info__connector-step-mode">
-                                                                            {formatModeLabel(
-                                                                                item.mode
-                                                                            )}
-                                                                            {item.lineName
-                                                                                ? ` • ${item.lineName}`
-                                                                                : ""}
-                                                                        </span>
-                                                                        {item.durationText ||
-                                                                        item.distanceText ? (
-                                                                            <span className="info__connector-step-meta">
-                                                                                {
-                                                                                    item.durationText
-                                                                                }
-                                                                                {item.durationText &&
-                                                                                item.distanceText
-                                                                                    ? " • "
-                                                                                    : ""}
-                                                                                {
-                                                                                    item.distanceText
-                                                                                }
-                                                                            </span>
-                                                                        ) : null}
-                                                                        {item.instructions ? (
-                                                                            <span className="info__connector-step-note">
-                                                                                {
-                                                                                    item.instructions
-                                                                                }
-                                                                            </span>
-                                                                        ) : null}
-                                                                    </li>
-                                                                )
-                                                            )}
-                                                        </ul>
-                                                    ) : primarySegment?.instructions ? (
-                                                        <span className="info__connector-note">
-                                                            {
-                                                                primarySegment.instructions
-                                                            }
-                                                        </span>
-                                                    ) : null}
+                                                    {/* Simplified per user request: hide per-segment steps and instructions */
+                                                    }
                                                 </div>
                                             </div>
                                         ) : null}
@@ -528,6 +471,82 @@ function buildTravelSummary(segments: RouteSegment[]): string | null {
     }
 
     return distance ?? null;
+}
+
+// Build a concise label representing the overall path across segments
+function buildOverallPathLabel(segments: RouteSegment[]): string | undefined {
+    const labels = segments.map((s) => {
+        if (s.lineName && s.lineName.trim()) return s.lineName.trim();
+        if (s.agency && s.agency.trim()) return s.agency.trim();
+        return formatModeLabel(s.mode);
+    });
+
+    // Collapse consecutive duplicates
+    const collapsed: string[] = [];
+    for (const label of labels) {
+        if (!collapsed.length || collapsed[collapsed.length - 1] !== label) {
+            collapsed.push(label);
+        }
+    }
+
+    // If everything is the same label, just show one
+    const unique = Array.from(new Set(collapsed));
+    if (unique.length === 1) return unique[0];
+
+    // Otherwise, join with → to indicate transfers
+    return collapsed.join(" → ");
+}
+
+// Summarize only the total transit time across all segments
+function buildTotalSummary(segments: RouteSegment[]): string | null {
+    const minutes = segments
+        .map((s) => (s.durationText ? parseDurationToMinutes(s.durationText) : null))
+        .filter((v): v is number => typeof v === "number" && Number.isFinite(v))
+        .reduce((acc, v) => acc + v, 0);
+
+    if (!minutes || minutes <= 0) {
+        return null;
+    }
+
+    return formatMinutes(minutes);
+}
+
+function parseDurationToMinutes(text: string): number | null {
+    // Accept variations like: "1h 5m", "1 h 5 min", "75 min", "2 hours 10 mins"
+    const normalized = text.trim().toLowerCase();
+
+    // Try hour + minute
+    const hm = normalized.match(/(\d+)\s*h(?:our|ours)?\s*(\d+)?\s*m?(?:in|ins|inutes)?/);
+    if (hm) {
+        const h = parseInt(hm[1], 10);
+        const m = hm[2] ? parseInt(hm[2], 10) : 0;
+        if (Number.isFinite(h) && Number.isFinite(m)) return h * 60 + m;
+    }
+
+    // Try only hours
+    const hOnly = normalized.match(/(\d+)\s*h(?:our|ours)?/);
+    if (hOnly) {
+        const h = parseInt(hOnly[1], 10);
+        if (Number.isFinite(h)) return h * 60;
+    }
+
+    // Try only minutes
+    const mOnly = normalized.match(/(\d+)\s*m(?:in|ins|inutes)?/);
+    if (mOnly) {
+        const m = parseInt(mOnly[1], 10);
+        if (Number.isFinite(m)) return m;
+    }
+
+    return null;
+}
+
+function formatMinutes(minutes: number): string {
+    if (minutes >= 60) {
+        const h = Math.floor(minutes / 60);
+        const m = minutes % 60;
+        return m ? `${h}h ${m}m` : `${h}h`;
+    }
+    return `${minutes} min`;
 }
 
 function formatModeLabel(mode: string): string {
