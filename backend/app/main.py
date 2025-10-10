@@ -13,6 +13,8 @@ from .schemas import (
     LocationSearchRequest,
     LocationSearchResult,
     MapRoute,
+    MultiLegRoute,
+    LegPolyline,
     PromptRequest,
     SuggestionOptions,
     TravelPlan,
@@ -95,6 +97,33 @@ async def get_route(plan_id: str) -> MapRoute:
     )
 
 
+@app.get("/api/plan/{plan_id}/route-multileg", response_model=MultiLegRoute)
+async def get_route_multileg(plan_id: str) -> MultiLegRoute:
+    plan = get_plan(plan_id)
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+
+    stops = plan.stops
+    legs: list[LegPolyline] = []
+    # For each adjacent pair, request a route and capture its polyline and segments
+    for i in range(len(stops) - 1):
+        pair = [stops[i], stops[i + 1]]
+        polyline = await maps_client.build_route_polyline(pair)
+        segments = maps_client.get_last_segments()
+        warnings = maps_client.get_last_warnings()
+        legs.append(
+            LegPolyline(
+                from_index=i,
+                to_index=i + 1,
+                polyline=polyline,
+                warnings=warnings,
+                segments=segments,
+            )
+        )
+
+    return MultiLegRoute(plan_id=plan_id, legs=legs)
+
+
 @app.get("/api/config/maps-key")
 def get_maps_key() -> dict[str, str]:
     api_key = maps_client.api_key
@@ -108,7 +137,21 @@ async def search_map_location(request: LocationSearchRequest) -> LocationSearchR
     result = await maps_client.search_location(request.query)
     if not result:
         raise HTTPException(status_code=404, detail="No British Columbia location found for that query")
-    return LocationSearchResult(**result)
+    # Narrow dynamic types before constructing the pydantic model
+    lat_obj = result.get("latitude")
+    lng_obj = result.get("longitude")
+    if not isinstance(lat_obj, (int, float)) or not isinstance(lng_obj, (int, float)):
+        raise HTTPException(status_code=500, detail="Invalid location coordinates from maps provider")
+
+    address_val = result.get("address")
+    place_id_val = result.get("place_id")
+    return LocationSearchResult(
+        label=str(result.get("label", "")),
+        address=str(address_val) if isinstance(address_val, str) else None,
+        place_id=str(place_id_val) if isinstance(place_id_val, str) else None,
+        latitude=float(lat_obj),
+        longitude=float(lng_obj),
+    )
 
 
 @app.post("/api/tripadvisor", response_model=TripAdvisorResponse)

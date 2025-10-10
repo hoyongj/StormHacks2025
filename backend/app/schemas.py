@@ -53,6 +53,23 @@ class MapRoute(BaseModel):
     segments: List['RouteSegment'] = Field(default_factory=list)
 
 
+class LegPolyline(BaseModel):
+    """Polyline and metadata for a single leg (adjacent stop pair)."""
+
+    from_index: int
+    to_index: int
+    polyline: str
+    warnings: List[str] = Field(default_factory=list)
+    segments: List['RouteSegment'] = Field(default_factory=list)
+
+
+class MultiLegRoute(BaseModel):
+    """Set of polylines generated per adjacent stop pair."""
+
+    plan_id: str
+    legs: List[LegPolyline] = Field(default_factory=list)
+
+
 class SuggestionOptions(BaseModel):
     """Collection of existing plans returned by the lightweight listing endpoint."""
 
@@ -357,6 +374,7 @@ class TripSummaryInterface:
 
 
 MapRoute.update_forward_refs(RouteSegment=RouteSegment)
+LegPolyline.update_forward_refs(RouteSegment=RouteSegment)
 
 
 __all__ = [

@@ -7,6 +7,7 @@ import {
     useState,
 } from "react";
 import MapView from "./components/MapView";
+import MultiLegMapView from "./components/MultiLegMapView";
 import InfoPanel from "./components/InfoPanel";
 import TripAdvisor from "./components/TripAdvisor";
 import AiAssistantPanel from "./components/AiAssistantPanel";
@@ -249,9 +250,23 @@ function App() {
         index: number;
     } | null>(null);
     const [routeSegments, setRouteSegments] = useState<RouteSegment[]>([]);
-    const [view, setView] = useState<"planner" | "manager" | "admin">(
-        "planner"
-    );
+    const [view, setView] = useState<
+        "planner" | "manager" | "admin" | "multileg"
+    >(() => {
+        if (typeof window === "undefined") {
+            return "planner";
+        }
+        const stored = window.localStorage.getItem("app_view");
+        if (
+            stored === "planner" ||
+            stored === "manager" ||
+            stored === "admin" ||
+            stored === "multileg"
+        ) {
+            return stored;
+        }
+        return "planner";
+    });
     const [folders, setFolders] = useState<Folder[]>([
         { id: "all", name: "All Plans", planIds: [] },
     ]);
@@ -286,6 +301,13 @@ function App() {
             setLibraryFolderId("all");
         }
     }, [folders, libraryFolderId]);
+
+    useEffect(() => {
+        if (typeof window === "undefined") {
+            return;
+        }
+        window.localStorage.setItem("app_view", view);
+    }, [view]);
 
     const [draftPlan, setDraftPlan] = useState<TravelPlan | null>(null);
     const [isDraftDirty, setIsDraftDirty] = useState(false);
@@ -1264,6 +1286,23 @@ function App() {
                             Manage Plans
                         </button>
                     )}
+                    {view !== "multileg" ? (
+                        <button
+                            type="button"
+                            className="app__nav-button"
+                            onClick={() => setView("multileg")}
+                        >
+                            Multi‑leg Transit
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            className="app__nav-button"
+                            onClick={() => setView("planner")}
+                        >
+                            Back to Standard
+                        </button>
+                    )}
                     {view === "planner" ? (
                         <button
                             type="button"
@@ -1513,6 +1552,86 @@ function App() {
                     onUpdatePlanDate={handleUpdatePlanDate}
                     onDeletePlan={handleDeletePlan}
                 />
+            ) : view === "multileg" ? (
+                <div className="app__layout">
+                    <aside className="app__summary">
+                        <div className="info">
+                            <h2>Multi‑leg Transit Preview</h2>
+                            <p className="manager__hint">
+                                Each adjacent stop pair is routed separately and
+                                drawn as distinct polylines for better transit
+                                accuracy.
+                            </p>
+                        </div>
+                    </aside>
+                    <section className="app__content">
+                        <div className="app__primary">
+                            <div className="app__map">
+                                <MultiLegMapView plan={selectedPlan} />
+                            </div>
+                            <div className="app__to-go">
+                                <ToGoList
+                                    plan={selectedPlan}
+                                    draftStops={draftPlan?.stops ?? null}
+                                    isLoading={isLoading}
+                                    onSelectStop={handleStopSelected}
+                                    selectedStopIndex={selectedStopIndex}
+                                    onAddStop={
+                                        draftPlan
+                                            ? handleDraftAddStop
+                                            : undefined
+                                    }
+                                    onUpdateStop={
+                                        draftPlan
+                                            ? handleDraftUpdateStop
+                                            : undefined
+                                    }
+                                    onRemoveStop={
+                                        draftPlan
+                                            ? handleDraftRemoveStop
+                                            : undefined
+                                    }
+                                    onSave={
+                                        draftPlan ? handleDraftSave : undefined
+                                    }
+                                    hasPendingChanges={isDraftDirty}
+                                />
+                            </div>
+                        </div>
+                        <TripAdvisor
+                            selectedStop={selectedStop}
+                            info={advisorInfo}
+                            isLoading={advisorLoading}
+                            error={advisorError}
+                            stops={
+                                draftPlan?.stops ?? selectedPlan?.stops ?? []
+                            }
+                            onAddSuggestion={
+                                draftPlan ? handleAddSuggestionStop : undefined
+                            }
+                        />
+                    </section>
+                    <aside className="app__assistant">
+                        <AiAssistantPanel
+                            planTitle={workingPlan?.title ?? null}
+                            selectedStop={selectedStop}
+                            selectedStopIndex={selectedStopIndex}
+                            stops={draftPlan?.stops ?? workingPlanStops}
+                            onAddStop={
+                                draftPlan ? handleAssistantAddStop : undefined
+                            }
+                            onUpdateStop={
+                                draftPlan ? handleDraftUpdateStop : undefined
+                            }
+                            onRemoveStop={
+                                draftPlan ? handleDraftRemoveStop : undefined
+                            }
+                            onMoveStop={
+                                draftPlan ? handleDraftMoveStop : undefined
+                            }
+                        />
+                    </aside>
+                </div>
             ) : (
                 <AdminPanel
                     profile={profile}
