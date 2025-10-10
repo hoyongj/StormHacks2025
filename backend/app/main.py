@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from .dependencies import get_google_maps_api_key
-from .repository import get_plan, init_db, list_plans as fetch_travel_plans, save_plan
+from .repository import get_plan, init_db, list_plans as fetch_travel_plans, save_plan, seed_admin
 from .schemas import (
     ChatRequest,
     ChatResponse,
@@ -158,6 +158,12 @@ async def search_map_location(request: LocationSearchRequest) -> LocationSearchR
 async def describe_place(request: TripAdvisorRequest) -> TripAdvisorResponse:
     info = await tripadvisor_service.describe_location(request)
     return TripAdvisorResponse(info=info)
+
+
+@app.post("/api/admin/seed")
+def seed_admin_user():
+    seed_admin()
+    return {"message": "Admin user seeded successfully."}
 
 
 # Provide compatibility for uvicorn --factory

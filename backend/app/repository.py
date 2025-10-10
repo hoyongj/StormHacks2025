@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import bcrypt
+import hashlib
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Generator, Iterable, List, Optional
+import uuid
 
 from .schemas import PlanStop, TravelPlan
 
@@ -59,8 +62,9 @@ def init_db() -> None:
 
     """ Sample plan """
     if not list_plan_ids():
-        seed_sample_plan()
-        seed_ubc_plan()
+        # seed_sample_plan()
+        # seed_ubc_plan()
+        seed_admin()
 
 
 @contextmanager
@@ -241,6 +245,24 @@ def seed_ubc_plan() -> None:
         ],
     )
     save_plan(sample)
+
+
+def seed_admin() -> None:
+    import bcrypt
+
+    admin_email = "admin@example.com"
+    admin_password = "admin123"  # Replace with a secure password in production
+    hashed_password = bcrypt.hashpw(admin_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO users (id, email, first_name, last_name, password_hash, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (str(uuid.uuid4()), admin_email, "Admin", "User", hashed_password, datetime.utcnow().isoformat()),
+        )
+        conn.commit()
 
 
 def _ensure_column(conn: sqlite3.Connection, table: str, column: str, definition: str) -> None:
