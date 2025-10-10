@@ -173,9 +173,27 @@ type TripAdvisorSuggestionPayload = {
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 function App() {
-    // Quick path-based routing: show the auth page at /auth without adding a router dependency.
-    if (typeof window !== "undefined" && window.location.pathname === "/auth") {
+    // Simple auth guard: if no token, redirect to /auth and pause rendering
+    const isBrowser = typeof window !== "undefined";
+    const isAuthPage = isBrowser && window.location.pathname === "/auth";
+    const [hasToken] = useState<boolean>(
+        () => isBrowser && !!localStorage.getItem("auth_token")
+    );
+
+    useEffect(() => {
+        if (!isAuthPage && !hasToken && isBrowser) {
+            window.location.href = "/auth";
+        }
+    }, [isAuthPage, hasToken, isBrowser]);
+
+    // Render auth page as-is when at /auth
+    if (isAuthPage) {
         return <AuthPage />;
+    }
+
+    // While redirecting unauthenticated users, render nothing
+    if (!hasToken) {
+        return null;
     }
     const [plans, setPlans] = useState<TravelPlan[]>([]);
     const [selectedPlanId, setSelectedPlanId] = useState<string>("");

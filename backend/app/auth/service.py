@@ -53,6 +53,19 @@ def _fetch_user_by_email(conn: sqlite3.Connection, email: str) -> dict | None:
     }
 
 
+def _fetch_user_by_id(conn: sqlite3.Connection, user_id: str) -> dict | None:
+    row = conn.execute("SELECT id, email, first_name, last_name, password_hash FROM users WHERE id = ?", (user_id,)).fetchone()
+    if not row:
+        return None
+    return {
+        "id": row[0],
+        "email": row[1],
+        "first_name": row[2],
+        "last_name": row[3],
+        "password_hash": row[4],
+    }
+
+
 def authenticate_user(email: str, password: str, conn: sqlite3.Connection) -> dict | None:
     user = _fetch_user_by_email(conn, email)
     if not user or not verify_password(password, user["password_hash"]):
@@ -129,3 +142,15 @@ def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm, Annot
         raise AuthenticationError()
     token = create_access_token(user["email"], UUID(user["id"]), timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     return models.Token(access_token=token, token_type="bearer")
+
+
+def change_password(conn: sqlite3.Connection, user_id: str, current_password: str, new_password: str) -> None:
+    user = _fetch_user_by_id(conn, user_id)
+    if not user:
+        raise AuthenticationError()
+    if not verify_password(current_password, user["password_hash"]):
+        raise ValueError("Current password is incorrect")
+    # Hash the new password and update
+    new_hash = get_password_hash(new_password)
+    conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, user_id))
+    conn.commit()

@@ -10,7 +10,7 @@ class RegisterUserRequest(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
-    
+
 class TokenData(BaseModel):
     user_id: str | None = None
 
@@ -18,3 +18,8 @@ class TokenData(BaseModel):
         if self.user_id:
             return UUID(self.user_id)
         return None
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str

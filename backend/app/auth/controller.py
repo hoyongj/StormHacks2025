@@ -1,5 +1,5 @@
 from typing import Annotated
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, Request, HTTPException, Header
 from starlette import status
 from . import  models
 from . import service
@@ -49,6 +49,36 @@ async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm,
             pass
         with get_connection() as conn:
             return service.login_for_access_token(form_data, conn)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except sqlite3.Error as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/me", response_model=models.TokenData)
+async def get_me(authorization: str | None = Header(default=None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid token")
+    token = authorization.removeprefix("Bearer ").strip()
+    try:
+        return service.verify_token(token)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
+@router.post("/change-password")
+async def change_password(request: Request, payload: models.ChangePasswordRequest, authorization: str | None = Header(default=None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid token")
+    token = authorization.removeprefix("Bearer ").strip()
+    try:
+        token_data = service.verify_token(token)
+        user_id = token_data.user_id
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        with get_connection() as conn:
+            service.change_password(conn, user_id, payload.current_password, payload.new_password)
+        return {"status": "ok"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except sqlite3.Error as e:
