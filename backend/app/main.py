@@ -40,8 +40,8 @@ tripadvisor_service = TripAdvisorService(get_google_maps_api_key())
 
 init_db()
 
-# mount auth router
-app.include_router(auth_controller.router)
+# mount auth router under /api to align with frontend proxy
+app.include_router(auth_controller.router, prefix="/api")
 
 
 @app.get("/api/health")

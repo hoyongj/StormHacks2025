@@ -174,7 +174,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 function App() {
     // Quick path-based routing: show the auth page at /auth without adding a router dependency.
-    if (typeof window !== 'undefined' && window.location.pathname === '/auth') {
+    if (typeof window !== "undefined" && window.location.pathname === "/auth") {
         return <AuthPage />;
     }
     const [plans, setPlans] = useState<TravelPlan[]>([]);
