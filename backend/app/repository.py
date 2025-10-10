@@ -57,6 +57,7 @@ def init_db() -> None:
             """
         )
 
+    """ Sample plan """
     # if not list_plan_ids():
     #     seed_sample_plan()
     #     seed_ubc_plan()
