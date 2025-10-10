@@ -22,6 +22,7 @@ from .schemas import (
 from .services.gemini import GeminiClient
 from .services.maps import MapsClient
 from .services.tripadvisor import TripAdvisorService
+from .auth import controller as auth_controller
 
 app = FastAPI(title="Pathfinder API", version="0.1.0")
 
@@ -38,6 +39,9 @@ maps_client = MapsClient(get_google_maps_api_key())
 tripadvisor_service = TripAdvisorService(get_google_maps_api_key())
 
 init_db()
+
+# mount auth router
+app.include_router(auth_controller.router)
 
 
 @app.get("/api/health")

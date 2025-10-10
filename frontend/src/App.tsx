@@ -14,6 +14,7 @@ import ToGoList from "./components/ToGoList";
 import PlanManager from "./components/PlanManager";
 import AdminPanel from "./components/AdminPanel";
 import "./App.css";
+import AuthPage from "./components/AuthPage";
 
 export type PlanStop = {
     label: string;
@@ -172,6 +173,10 @@ type TripAdvisorSuggestionPayload = {
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 function App() {
+    // Quick path-based routing: show the auth page at /auth without adding a router dependency.
+    if (typeof window !== 'undefined' && window.location.pathname === '/auth') {
+        return <AuthPage />;
+    }
     const [plans, setPlans] = useState<TravelPlan[]>([]);
     const [selectedPlanId, setSelectedPlanId] = useState<string>("");
     const [error, setError] = useState<string | null>(null);

@@ -43,6 +43,20 @@ def init_db() -> None:
         _ensure_column(conn, "plan_stops", "longitude", "REAL")
         conn.commit()
 
+        # Create a simple users table for lightweight authentication storage.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id TEXT PRIMARY KEY,
+                email TEXT NOT NULL UNIQUE,
+                first_name TEXT,
+                last_name TEXT,
+                password_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+
     if not list_plan_ids():
         seed_sample_plan()
         seed_ubc_plan()
