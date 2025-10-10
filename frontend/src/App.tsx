@@ -7,7 +7,6 @@ import {
     useState,
 } from "react";
 import MapView from "./components/MapView";
-import MultiLegMapView from "./components/MultiLegMapView";
 import InfoPanel from "./components/InfoPanel";
 import TripAdvisor from "./components/TripAdvisor";
 import AiAssistantPanel from "./components/AiAssistantPanel";
@@ -141,6 +140,21 @@ type RouteSegmentResponse = {
     line_name?: string;
 };
 
+type MultiLegLegResponse = {
+    from_index: number;
+    to_index: number;
+    polyline: string;
+    warnings?: string[];
+    segments?: RouteSegmentResponse[];
+};
+
+type MultiLegRouteResponse = {
+    plan_id: string;
+    legs: MultiLegLegResponse[];
+};
+
+type MapMode = "single" | "multileg";
+
 type TripAdvisorResponsePayload = {
     info: {
         id: string;
@@ -250,9 +264,15 @@ function App() {
         index: number;
     } | null>(null);
     const [routeSegments, setRouteSegments] = useState<RouteSegment[]>([]);
-    const [view, setView] = useState<
-        "planner" | "manager" | "admin" | "multileg"
-    >(() => {
+    const [mapMode, setMapMode] = useState<MapMode>(() => {
+        if (typeof window === "undefined") {
+            return "single";
+        }
+        const stored = window.localStorage.getItem("planner_map_mode");
+        return stored === "multileg" ? "multileg" : "single";
+    });
+    const [mapRefreshKey, setMapRefreshKey] = useState(0);
+    const [view, setView] = useState<"planner" | "manager" | "admin">(() => {
         if (typeof window === "undefined") {
             return "planner";
         }
@@ -260,8 +280,7 @@ function App() {
         if (
             stored === "planner" ||
             stored === "manager" ||
-            stored === "admin" ||
-            stored === "multileg"
+            stored === "admin"
         ) {
             return stored;
         }
@@ -309,6 +328,13 @@ function App() {
         window.localStorage.setItem("app_view", view);
     }, [view]);
 
+    useEffect(() => {
+        if (typeof window === "undefined") {
+            return;
+        }
+        window.localStorage.setItem("planner_map_mode", mapMode);
+    }, [mapMode]);
+
     const [draftPlan, setDraftPlan] = useState<TravelPlan | null>(null);
     const [isDraftDirty, setIsDraftDirty] = useState(false);
     const latestAdvisorRequest = useRef(0);
@@ -322,6 +348,7 @@ function App() {
         () => workingPlan?.stops ?? [],
         [workingPlan]
     );
+    const stopCount = workingPlanStops.length;
 
     const selectedStop = useMemo(() => {
         if (!workingPlan || !selectedStopRef) {
@@ -341,6 +368,12 @@ function App() {
             ? selectedStopRef.index
             : null;
     }, [workingPlan, selectedStopRef]);
+
+    useEffect(() => {
+        if (mapMode === "multileg" && stopCount < 2) {
+            setMapMode("single");
+        }
+    }, [mapMode, stopCount]);
 
     useEffect(() => {
         if (!selectedPlan) {
@@ -467,20 +500,36 @@ function App() {
         let cancelled = false;
         const currentPlanId = selectedPlan.id;
 
-        async function loadRoute() {
+        async function loadSegments() {
             try {
-                const response = await fetch(
-                    `${API_BASE_URL}/plan/${currentPlanId}/route`
-                );
-                if (!response.ok) {
-                    throw new Error("Failed to load route details");
-                }
-                const payload: MapRouteResponse = await response.json();
-                const segments = (payload.segments ?? []).map(
-                    normalizeRouteSegment
-                );
-                if (!cancelled) {
-                    setRouteSegments(segments);
+                if (mapMode === "multileg") {
+                    const response = await fetch(
+                        `${API_BASE_URL}/plan/${currentPlanId}/route-multileg`
+                    );
+                    if (!response.ok) {
+                        throw new Error("Failed to load multi-leg route");
+                    }
+                    const payload: MultiLegRouteResponse = await response.json();
+                    const segments = (payload.legs ?? [])
+                        .flatMap((leg) => leg.segments ?? [])
+                        .map(normalizeRouteSegment);
+                    if (!cancelled) {
+                        setRouteSegments(segments);
+                    }
+                } else {
+                    const response = await fetch(
+                        `${API_BASE_URL}/plan/${currentPlanId}/route`
+                    );
+                    if (!response.ok) {
+                        throw new Error("Failed to load route details");
+                    }
+                    const payload: MapRouteResponse = await response.json();
+                    const segments = (payload.segments ?? []).map(
+                        normalizeRouteSegment
+                    );
+                    if (!cancelled) {
+                        setRouteSegments(segments);
+                    }
                 }
             } catch (err) {
                 if (!cancelled) {
@@ -489,12 +538,12 @@ function App() {
             }
         }
 
-        loadRoute();
+        loadSegments();
 
         return () => {
             cancelled = true;
         };
-    }, [selectedPlan, selectedPlanId, view]);
+    }, [selectedPlan, selectedPlanId, view, mapMode, mapRefreshKey]);
 
     const [planName, setPlanName] = useState("");
     const [editingName, setEditingName] = useState(false);
@@ -592,6 +641,14 @@ function App() {
             return "local-" + crypto.randomUUID();
         }
         return "local-" + Math.random().toString(36).slice(2, 10);
+    };
+
+    const handleMapModeChange = (nextMode: MapMode) => {
+        setMapMode((current) => (current === nextMode ? current : nextMode));
+    };
+
+    const handleMapRefresh = () => {
+        setMapRefreshKey((value) => value + 1);
     };
 
     const handlePlanTitleChange = (planId: string, title: string) => {
@@ -1286,23 +1343,6 @@ function App() {
                             Manage Plans
                         </button>
                     )}
-                    {view !== "multileg" ? (
-                        <button
-                            type="button"
-                            className="app__nav-button"
-                            onClick={() => setView("multileg")}
-                        >
-                            Multi‑leg Transit
-                        </button>
-                    ) : (
-                        <button
-                            type="button"
-                            className="app__nav-button"
-                            onClick={() => setView("planner")}
-                        >
-                            Back to Standard
-                        </button>
-                    )}
                     {view === "planner" ? (
                         <button
                             type="button"
@@ -1475,7 +1515,13 @@ function App() {
                         ) : null}
                         <div className="app__primary">
                             <div className="app__map">
-                                <MapView plan={selectedPlan} />
+                                <MapView
+                                    plan={selectedPlan}
+                                    mode={mapMode}
+                                    onModeChange={handleMapModeChange}
+                                    refreshKey={mapRefreshKey}
+                                    onRequestRefresh={handleMapRefresh}
+                                />
                             </div>
                             <div className="app__to-go">
                                 <ToGoList
@@ -1552,86 +1598,6 @@ function App() {
                     onUpdatePlanDate={handleUpdatePlanDate}
                     onDeletePlan={handleDeletePlan}
                 />
-            ) : view === "multileg" ? (
-                <div className="app__layout">
-                    <aside className="app__summary">
-                        <div className="info">
-                            <h2>Multi‑leg Transit Preview</h2>
-                            <p className="manager__hint">
-                                Each adjacent stop pair is routed separately and
-                                drawn as distinct polylines for better transit
-                                accuracy.
-                            </p>
-                        </div>
-                    </aside>
-                    <section className="app__content">
-                        <div className="app__primary">
-                            <div className="app__map">
-                                <MultiLegMapView plan={selectedPlan} />
-                            </div>
-                            <div className="app__to-go">
-                                <ToGoList
-                                    plan={selectedPlan}
-                                    draftStops={draftPlan?.stops ?? null}
-                                    isLoading={isLoading}
-                                    onSelectStop={handleStopSelected}
-                                    selectedStopIndex={selectedStopIndex}
-                                    onAddStop={
-                                        draftPlan
-                                            ? handleDraftAddStop
-                                            : undefined
-                                    }
-                                    onUpdateStop={
-                                        draftPlan
-                                            ? handleDraftUpdateStop
-                                            : undefined
-                                    }
-                                    onRemoveStop={
-                                        draftPlan
-                                            ? handleDraftRemoveStop
-                                            : undefined
-                                    }
-                                    onSave={
-                                        draftPlan ? handleDraftSave : undefined
-                                    }
-                                    hasPendingChanges={isDraftDirty}
-                                />
-                            </div>
-                        </div>
-                        <TripAdvisor
-                            selectedStop={selectedStop}
-                            info={advisorInfo}
-                            isLoading={advisorLoading}
-                            error={advisorError}
-                            stops={
-                                draftPlan?.stops ?? selectedPlan?.stops ?? []
-                            }
-                            onAddSuggestion={
-                                draftPlan ? handleAddSuggestionStop : undefined
-                            }
-                        />
-                    </section>
-                    <aside className="app__assistant">
-                        <AiAssistantPanel
-                            planTitle={workingPlan?.title ?? null}
-                            selectedStop={selectedStop}
-                            selectedStopIndex={selectedStopIndex}
-                            stops={draftPlan?.stops ?? workingPlanStops}
-                            onAddStop={
-                                draftPlan ? handleAssistantAddStop : undefined
-                            }
-                            onUpdateStop={
-                                draftPlan ? handleDraftUpdateStop : undefined
-                            }
-                            onRemoveStop={
-                                draftPlan ? handleDraftRemoveStop : undefined
-                            }
-                            onMoveStop={
-                                draftPlan ? handleDraftMoveStop : undefined
-                            }
-                        />
-                    </aside>
-                </div>
             ) : (
                 <AdminPanel
                     profile={profile}

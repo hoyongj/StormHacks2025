@@ -255,11 +255,12 @@ function InfoPanel({
           {plan?.stops?.length ? (
             plan.stops.map((stop, index) => {
               const nextStop = plan.stops[index + 1];
-              const segment = routeSegments.find((item) => item.fromIndex === index);
-              const travelSummary = segment?.durationText
-                ? segment.distanceText
-                  ? `${segment.durationText} • ${segment.distanceText}`
-                  : segment.durationText
+              const segmentsForStop = routeSegments
+                .filter((item) => item.fromIndex === index)
+                .sort((a, b) => a.toIndex - b.toIndex);
+              const primarySegment = segmentsForStop[0];
+              const travelSummary = segmentsForStop.length
+                ? buildTravelSummary(segmentsForStop)
                 : nextStop
                 ? fallbackTravelEstimate(
                     stop.latitude,
@@ -269,10 +270,10 @@ function InfoPanel({
                   )
                 : null;
               const connectorLabel =
-                segment?.lineName ||
-                segment?.agency ||
-                (segment?.mode ? formatModeLabel(segment.mode) : undefined);
-              const connectorIconText = (segment?.mode || 'TRANSIT').slice(0, 1);
+                primarySegment?.lineName ||
+                primarySegment?.agency ||
+                (primarySegment?.mode ? formatModeLabel(primarySegment.mode) : undefined);
+              const connectorIconText = (primarySegment?.mode || 'TRANSIT').slice(0, 1);
 
               return (
                 <li key={stop.label + index} className="info__stop-card">
@@ -291,8 +292,32 @@ function InfoPanel({
                         <div>
                           <span className="info__connector-mode">{connectorLabel || 'Transit'}</span>
                           <span className="info__connector-metrics">{travelSummary}</span>
-                          {segment?.instructions ? (
-                            <span className="info__connector-note">{segment.instructions}</span>
+                          {segmentsForStop.length > 1 ? (
+                            <ul className="info__connector-steps">
+                              {segmentsForStop.map((item, stepIndex) => (
+                                <li
+                                  key={`${item.fromIndex}-${item.toIndex}-${stepIndex}`}
+                                  className="info__connector-step"
+                                >
+                                  <span className="info__connector-step-mode">
+                                    {formatModeLabel(item.mode)}
+                                    {item.lineName ? ` • ${item.lineName}` : ''}
+                                  </span>
+                                  {item.durationText || item.distanceText ? (
+                                    <span className="info__connector-step-meta">
+                                      {item.durationText}
+                                      {item.durationText && item.distanceText ? ' • ' : ''}
+                                      {item.distanceText}
+                                    </span>
+                                  ) : null}
+                                  {item.instructions ? (
+                                    <span className="info__connector-step-note">{item.instructions}</span>
+                                  ) : null}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : primarySegment?.instructions ? (
+                            <span className="info__connector-note">{primarySegment.instructions}</span>
                           ) : null}
                         </div>
                       </div>
@@ -388,6 +413,30 @@ function InfoPanel({
 }
 
 export default InfoPanel;
+
+function buildTravelSummary(segments: RouteSegment[]): string | null {
+  const durations = Array.from(
+    new Set(
+      segments
+        .map((segment) => segment.durationText?.trim())
+        .filter((value): value is string => Boolean(value))
+    )
+  );
+
+  const distance = segments
+    .map((segment) => segment.distanceText?.trim())
+    .find((value): value is string => Boolean(value));
+
+  if (durations.length && distance) {
+    return `${durations.join(' + ')} • ${distance}`;
+  }
+
+  if (durations.length) {
+    return durations.join(' + ');
+  }
+
+  return distance ?? null;
+}
 
 function formatModeLabel(mode: string): string {
   switch (mode.toUpperCase()) {
