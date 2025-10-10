@@ -19,7 +19,13 @@ ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl="/auth/token")
-bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Use bcrypt_sha256 to avoid the 72-byte input limit of raw bcrypt for new hashes.
+# Keep "bcrypt" in the context so verification still works if any legacy bcrypt hashes exist.
+bcrypt_context = CryptContext(
+    schemes=["bcrypt_sha256", "bcrypt"],
+    deprecated="auto",
+    bcrypt__truncate_error=False,
+)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -30,7 +36,8 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def get_password_hash(password: str) -> str:
-    return bcrypt_context.hash(password)
+    # Explicitly use bcrypt_sha256 for new hashes
+    return bcrypt_context.hash(password, scheme="bcrypt_sha256")
 
 
 def _fetch_user_by_email(conn: sqlite3.Connection, email: str) -> dict | None:
@@ -80,9 +87,6 @@ def register_user(conn: sqlite3.Connection, register_user_request: models.Regist
         pwd_len = len(pwd_bytes)
         has_non_ascii = any(b > 127 for b in pwd_bytes)
         logging.info("Register: received password bytes length=%d, non_ascii=%s", pwd_len, has_non_ascii)
-        if pwd_len > 72:
-            logging.warning("Password too long: length=%d", pwd_len)
-            raise ValueError("Password cannot be longer than 72 bytes; please use a shorter password or truncate manually (e.g. password[:72]).")
         user_id = str(uuid4())
         password_hash = get_password_hash(register_user_request.password)
         conn.execute(
@@ -118,9 +122,7 @@ def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm, Annot
     pwd_len = len(pwd_bytes)
     has_non_ascii = any(b > 127 for b in pwd_bytes)
     logging.info("Login attempt: username=%s password_bytes_length=%d non_ascii=%s", form_data.username, pwd_len, has_non_ascii)
-    if pwd_len > 72:
-        logging.warning("Login password too long: length=%d", pwd_len)
-        raise ValueError("Password cannot be longer than 72 bytes; please use a shorter password or truncate manually (e.g. password[:72]).")
+    # No manual 72-byte enforcement here; bcrypt_sha256 handles long passwords safely for new hashes.
 
     user = authenticate_user(form_data.username, form_data.password, conn)
     if user is None:
