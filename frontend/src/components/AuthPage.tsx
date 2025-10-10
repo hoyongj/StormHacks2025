@@ -29,8 +29,7 @@ function analyzePassword(pw: string): PasswordScore {
 }
 
 const AuthPage: React.FC = () => {
-    const [firstName, setFirstName] = useState("");
-    const [lastName, setLastName] = useState("");
+    const [fullName, setFullName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [isLogin, setIsLogin] = useState(true);
@@ -44,13 +43,19 @@ const AuthPage: React.FC = () => {
         setLoading(true);
         setServerError(null);
         try {
+            // Derive first/last from full name (split by last space)
+            const trimmed = fullName.trim();
+            const parts = trimmed.split(/\s+/);
+            const derivedFirst = parts.length > 1 ? parts.slice(0, -1).join(" ") : (parts[0] || email.split("@")[0] || "");
+            const derivedLast = parts.length > 1 ? parts[parts.length - 1] : "";
+
             const res = await fetch(`${API_BASE}/auth/`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     email,
-                    first_name: firstName || email.split("@")[0] || "",
-                    last_name: lastName || "",
+                    first_name: derivedFirst,
+                    last_name: derivedLast,
                     password,
                 }),
             });
@@ -66,7 +71,14 @@ const AuthPage: React.FC = () => {
                 setServerError(errDetail);
                 return;
             }
-            // Success
+            // Success: store a local profile for this email so the main app can pick it up after login
+            try {
+                if (email) {
+                    const profile = { name: trimmed || derivedFirst, email };
+                    localStorage.setItem(`profile:${email}`, JSON.stringify(profile));
+                }
+            } catch {}
+
             setIsLogin(true);
         } catch (e) {
             setServerError(
@@ -180,35 +192,15 @@ const AuthPage: React.FC = () => {
 
                         <form onSubmit={handleSubmit} className="form">
                             {!isLogin && (
-                                <div className="grid">
-                                    <div className="field">
-                                        <label htmlFor="firstName">
-                                            First name
-                                        </label>
-                                        <input
-                                            id="firstName"
-                                            value={firstName}
-                                            onChange={(e) =>
-                                                setFirstName(e.target.value)
-                                            }
-                                            placeholder="Jamie"
-                                            autoComplete="given-name"
-                                        />
-                                    </div>
-                                    <div className="field">
-                                        <label htmlFor="lastName">
-                                            Last name
-                                        </label>
-                                        <input
-                                            id="lastName"
-                                            value={lastName}
-                                            onChange={(e) =>
-                                                setLastName(e.target.value)
-                                            }
-                                            placeholder="Hoang"
-                                            autoComplete="family-name"
-                                        />
-                                    </div>
+                                <div className="field">
+                                    <label htmlFor="fullName">Full name</label>
+                                    <input
+                                        id="fullName"
+                                        value={fullName}
+                                        onChange={(e) => setFullName(e.target.value)}
+                                        placeholder="James Hoang"
+                                        autoComplete="name"
+                                    />
                                 </div>
                             )}
 

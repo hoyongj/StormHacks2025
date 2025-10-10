@@ -120,8 +120,6 @@ export type Folder = {
 export type UserProfile = {
     name: string;
     email: string;
-    homeCity: string;
-    bio?: string;
 };
 
 type MapRouteResponse = {
@@ -172,6 +170,48 @@ type TripAdvisorSuggestionPayload = {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
+function decodeJwtEmail(token: string | null): string | null {
+    if (!token) return null;
+    try {
+        const parts = token.split(".");
+        if (parts.length < 2) return null;
+        const payload = JSON.parse(
+            atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"))
+        );
+        return typeof payload?.sub === "string" ? payload.sub : null;
+    } catch {
+        return null;
+    }
+}
+
+function loadProfileForEmail(email: string | null): UserProfile | null {
+    try {
+        const key = email ? `profile:${email}` : "profile:guest";
+        const raw = localStorage.getItem(key);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (
+            parsed &&
+            typeof parsed === "object" &&
+            typeof parsed.name === "string" &&
+            typeof parsed.email === "string" &&
+            true
+        ) {
+            return parsed as UserProfile;
+        }
+        return null;
+    } catch {
+        return null;
+    }
+}
+
+function saveProfileForEmail(email: string | null, profile: UserProfile) {
+    try {
+        const key = email ? `profile:${email}` : "profile:guest";
+        localStorage.setItem(key, JSON.stringify(profile));
+    } catch {}
+}
+
 function App() {
     // Simple auth guard: if no token, redirect to /auth and pause rendering
     const isBrowser = typeof window !== "undefined";
@@ -216,12 +256,30 @@ function App() {
         { id: "all", name: "All Plans", planIds: [] },
     ]);
     const [libraryFolderId, setLibraryFolderId] = useState("all");
-    const [profile, setProfile] = useState<UserProfile>({
-        name: "Jamie Hoang",
-        email: "jamie.hoang@example.com",
-        homeCity: "Vancouver, BC",
-        bio: "Train-hopping foodie who loves scenic detours.",
+    const [profile, setProfile] = useState<UserProfile>(() => {
+        const token =
+            typeof window !== "undefined"
+                ? localStorage.getItem("auth_token")
+                : null;
+        const emailFromToken = decodeJwtEmail(token);
+        const stored =
+            typeof window !== "undefined"
+                ? loadProfileForEmail(emailFromToken)
+                : null;
+        if (stored) return stored;
+        // default if nothing stored
+        return {
+            name: emailFromToken ? emailFromToken.split("@")[0] : "Jamie Hoang",
+            email: emailFromToken ?? "jamie.hoang@example.com",
+        };
     });
+
+    // Persist profile per-user whenever it changes
+    useEffect(() => {
+        const token = localStorage.getItem("auth_token");
+        const emailFromToken = decodeJwtEmail(token);
+        saveProfileForEmail(emailFromToken, profile);
+    }, [profile]);
 
     useEffect(() => {
         if (!folders.some((folder) => folder.id === libraryFolderId)) {

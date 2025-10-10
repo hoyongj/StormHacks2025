@@ -153,32 +153,12 @@ const AdminPanel = ({ profile, onUpdateProfile }: AdminPanelProps) => {
                                 placeholder="you@example.com"
                             />
                         </label>
-                        <label className="admin__field admin__field--full">
-                            <span>Home base</span>
-                            <input
-                                type="text"
-                                value={localProfile.homeCity}
-                                onChange={(event) =>
-                                    handleChange("homeCity", event.target.value)
-                                }
-                                placeholder="City, Country"
-                            />
-                        </label>
+                        {/* Home base removed per latest requirements */}
                     </div>
                 </section>
 
                 <section className="admin__section">
-                    <h3>Bio</h3>
-                    <label className="admin__field admin__field--full">
-                        <textarea
-                            rows={4}
-                            value={localProfile.bio ?? ""}
-                            onChange={(event) =>
-                                handleChange("bio", event.target.value)
-                            }
-                            placeholder="Tell collaborators about your travel style, favourite routes, or planning preferences."
-                        />
-                    </label>
+                        {/* Bio section removed per latest requirements */}
                 </section>
 
                 <section className="admin__section">

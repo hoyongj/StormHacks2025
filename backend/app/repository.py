@@ -57,9 +57,9 @@ def init_db() -> None:
             """
         )
 
-    if not list_plan_ids():
-        seed_sample_plan()
-        seed_ubc_plan()
+    # if not list_plan_ids():
+    #     seed_sample_plan()
+    #     seed_ubc_plan()
 
 
 @contextmanager
