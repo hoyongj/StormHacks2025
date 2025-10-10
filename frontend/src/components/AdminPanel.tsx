@@ -158,7 +158,7 @@ const AdminPanel = ({ profile, onUpdateProfile }: AdminPanelProps) => {
                 </section>
 
                 <section className="admin__section">
-                        {/* Bio section removed per latest requirements */}
+                    {/* Bio section removed per latest requirements */}
                 </section>
 
                 <section className="admin__section">

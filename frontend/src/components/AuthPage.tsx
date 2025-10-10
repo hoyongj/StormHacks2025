@@ -46,7 +46,10 @@ const AuthPage: React.FC = () => {
             // Derive first/last from full name (split by last space)
             const trimmed = fullName.trim();
             const parts = trimmed.split(/\s+/);
-            const derivedFirst = parts.length > 1 ? parts.slice(0, -1).join(" ") : (parts[0] || email.split("@")[0] || "");
+            const derivedFirst =
+                parts.length > 1
+                    ? parts.slice(0, -1).join(" ")
+                    : parts[0] || email.split("@")[0] || "";
             const derivedLast = parts.length > 1 ? parts[parts.length - 1] : "";
 
             const res = await fetch(`${API_BASE}/auth/`, {
@@ -75,7 +78,10 @@ const AuthPage: React.FC = () => {
             try {
                 if (email) {
                     const profile = { name: trimmed || derivedFirst, email };
-                    localStorage.setItem(`profile:${email}`, JSON.stringify(profile));
+                    localStorage.setItem(
+                        `profile:${email}`,
+                        JSON.stringify(profile)
+                    );
                 }
             } catch {}
 
@@ -162,6 +168,15 @@ const AuthPage: React.FC = () => {
                 </div>
 
                 <div className="auth-right">
+                    <div
+                        className="auth-brand"
+                        aria-label="Pathfinder branding"
+                    >
+                        <div className="brand-title">Pathfinder</div>
+                        <div className="brand-tagline">
+                            Plan smart. Travel better.
+                        </div>
+                    </div>
                     <div className="card">
                         <div className="tabs">
                             <button
@@ -197,7 +212,9 @@ const AuthPage: React.FC = () => {
                                     <input
                                         id="fullName"
                                         value={fullName}
-                                        onChange={(e) => setFullName(e.target.value)}
+                                        onChange={(e) =>
+                                            setFullName(e.target.value)
+                                        }
                                         placeholder="James Hoang"
                                         autoComplete="name"
                                     />
