@@ -509,7 +509,8 @@ function App() {
                     if (!response.ok) {
                         throw new Error("Failed to load multi-leg route");
                     }
-                    const payload: MultiLegRouteResponse = await response.json();
+                    const payload: MultiLegRouteResponse =
+                        await response.json();
                     const segments = (payload.legs ?? [])
                         .flatMap((leg) =>
                             (leg.segments ?? []).map((seg) => ({

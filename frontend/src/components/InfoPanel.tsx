@@ -330,8 +330,7 @@ function InfoPanel({
                                                     <span className="info__connector-metrics">
                                                         {travelSummary}
                                                     </span>
-                                                    {/* Simplified per user request: hide per-segment steps and instructions */
-                                                    }
+                                                    {/* Simplified per user request: hide per-segment steps and instructions */}
                                                 </div>
                                             </div>
                                         ) : null}
@@ -500,7 +499,9 @@ function buildOverallPathLabel(segments: RouteSegment[]): string | undefined {
 // Summarize only the total transit time across all segments
 function buildTotalSummary(segments: RouteSegment[]): string | null {
     const minutes = segments
-        .map((s) => (s.durationText ? parseDurationToMinutes(s.durationText) : null))
+        .map((s) =>
+            s.durationText ? parseDurationToMinutes(s.durationText) : null
+        )
         .filter((v): v is number => typeof v === "number" && Number.isFinite(v))
         .reduce((acc, v) => acc + v, 0);
 
@@ -516,7 +517,9 @@ function parseDurationToMinutes(text: string): number | null {
     const normalized = text.trim().toLowerCase();
 
     // Try hour + minute
-    const hm = normalized.match(/(\d+)\s*h(?:our|ours)?\s*(\d+)?\s*m?(?:in|ins|inutes)?/);
+    const hm = normalized.match(
+        /(\d+)\s*h(?:our|ours)?\s*(\d+)?\s*m?(?:in|ins|inutes)?/
+    );
     if (hm) {
         const h = parseInt(hm[1], 10);
         const m = hm[2] ? parseInt(hm[2], 10) : 0;
