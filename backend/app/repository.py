@@ -34,6 +34,7 @@ def init_db() -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 plan_id TEXT NOT NULL,
                 label TEXT NOT NULL,
+                display_label TEXT,
                 description TEXT,
                 place_id TEXT,
                 position INTEGER NOT NULL,
@@ -45,6 +46,7 @@ def init_db() -> None:
         )
         _ensure_column(conn, "plan_stops", "latitude", "REAL")
         _ensure_column(conn, "plan_stops", "longitude", "REAL")
+        _ensure_column(conn, "plan_stops", "display_label", "TEXT")
         _ensure_column(conn, "plans", "owner_id", "TEXT")
         conn.execute(
             """
@@ -137,12 +139,13 @@ def save_plan(plan: TravelPlan, owner_id: Optional[str]) -> None:
         for position, stop in enumerate(plan.stops):
             conn.execute(
                 """
-                INSERT INTO plan_stops (plan_id, label, description, place_id, position, latitude, longitude)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO plan_stops (plan_id, label, display_label, description, place_id, position, latitude, longitude)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     plan.id,
                     stop.label,
+                    stop.display_name,
                     stop.description,
                     stop.place_id,
                     position,
@@ -206,7 +209,7 @@ def delete_plan(plan_id: str, owner_id: str) -> bool:
 def _fetch_stops(conn: sqlite3.Connection, plan_id: str) -> List[PlanStop]:
     stop_rows = conn.execute(
         """
-        SELECT label, description, place_id, latitude, longitude
+        SELECT label, display_label, description, place_id, latitude, longitude
         FROM plan_stops
         WHERE plan_id = ?
         ORDER BY position ASC
@@ -216,12 +219,13 @@ def _fetch_stops(conn: sqlite3.Connection, plan_id: str) -> List[PlanStop]:
     return [
         PlanStop(
             label=label,
+            display_name=display_label,
             description=description,
             place_id=place_id,
             latitude=latitude,
             longitude=longitude,
         )
-        for label, description, place_id, latitude, longitude in stop_rows
+        for label, display_label, description, place_id, latitude, longitude in stop_rows
     ]
 
 

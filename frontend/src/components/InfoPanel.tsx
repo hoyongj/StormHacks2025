@@ -123,9 +123,10 @@ function InfoPanel({
                         : null;
 
                     const pieces: string[] = [];
+                    const stopTitle = stop.displayName || stop.label || "Untitled stop";
                     pieces.push(
                         `<h3>${escapeHtml(
-                            `${index + 1}. ${stop.label || "Untitled stop"}`
+                            `${index + 1}. ${stopTitle}`
                         )}</h3>`
                     );
                     if (stop.description) {
@@ -184,7 +185,7 @@ function InfoPanel({
     </section>
     <section>
       <h2>Stops</h2>
-      ${stopsHtml || "<p>No stops yet.</p>"}
+            ${stopsHtml || "<p>No stops yet.</p>"}
     </section>
   </body>
 </html>`;
@@ -294,9 +295,11 @@ function InfoPanel({
                                 primarySegment?.mode || "TRANSIT"
                             ).slice(0, 1);
 
+                            const stopTitle =
+                                stop.displayName || stop.label || "Untitled stop";
                             return (
                                 <li
-                                    key={stop.label + index}
+                                    key={`${stopTitle}-${index}`}
                                     className="info__stop-card"
                                 >
                                     <div className="info__stop-marker">
@@ -307,7 +310,7 @@ function InfoPanel({
                                     </div>
                                     <div className="info__stop-content">
                                         <span className="info__stop-title">
-                                            {stop.label || "Untitled stop"}
+                                            {stopTitle}
                                         </span>
                                         {stop.description ? (
                                             <span className="info__stop-desc">

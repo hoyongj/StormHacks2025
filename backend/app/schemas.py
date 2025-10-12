@@ -11,6 +11,11 @@ class PlanStop(BaseModel):
     """Lightweight stop used by the legacy travel-plan endpoints."""
 
     label: str
+    display_name: Optional[str] = Field(
+        default=None,
+        alias="displayName",
+        description="Optional display label chosen by the user",
+    )
     description: Optional[str] = None
     place_id: Optional[str] = Field(
         default=None,

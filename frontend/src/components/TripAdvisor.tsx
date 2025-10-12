@@ -39,7 +39,11 @@ function TripAdvisor({
       <header className="advisor__header">
         <div>
           <p className="advisor__eyebrow">Trip Advisor</p>
-          <h3>{selectedStop ? selectedStop.label : 'Select a stop to see details'}</h3>
+          <h3>
+            {selectedStop
+              ? selectedStop.displayName || selectedStop.label
+              : 'Select a stop to see details'}
+          </h3>
         </div>
       </header>
 
@@ -79,9 +83,14 @@ function TripAdvisor({
           <p>Select one of the stops in your itinerary to see tailored suggestions.</p>
           {stops.length ? (
             <ol>
-              {stops.map((stop, index) => (
-                <li key={stop.label + index}>{stop.label}</li>
-              ))}
+              {stops.map((stop, index) => {
+                const title = stop.displayName || stop.label || 'Untitled stop';
+                return (
+                  <li key={`${title}-${index}`}>
+                    {title}
+                  </li>
+                );
+              })}
             </ol>
           ) : null}
         </div>
@@ -141,4 +150,3 @@ function LineItem({ suggestion, intent, onAdd, disabled }: LineItemProps) {
     </li>
   );
 }
-

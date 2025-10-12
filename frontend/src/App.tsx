@@ -18,6 +18,7 @@ import AuthPage from "./components/AuthPage";
 
 export type PlanStop = {
     label: string;
+    displayName?: string;
     description?: string;
     placeId?: string;
     latitude?: number;
@@ -55,6 +56,8 @@ type TravelPlanResponse = {
 
 type PlanStopResponse = {
     label: string;
+    display_name?: string | null;
+    displayName?: string | null;
     description?: string | null;
     placeId?: string | null;
     place_id?: string | null;
@@ -1092,12 +1095,17 @@ function App() {
         setDraftPlan((prev) => {
             if (!prev) return prev;
             setIsDraftDirty(true);
-            const nextIndex = prev.stops.length + 1;
+            const nextIndex = prev.stops.length;
+            const newName = `New Stop ${nextIndex + 1}`;
             const newStop: PlanStop = {
-                label: `New Stop ${nextIndex}`,
+                label: newName,
+                displayName: newName,
                 description: "",
             };
-            return { ...prev, stops: [...prev.stops, newStop] };
+            const updatedStops = [...prev.stops, newStop];
+            const updatedPlan = { ...prev, stops: updatedStops };
+            setSelectedStopRef({ planId: prev.id, index: nextIndex });
+            return updatedPlan;
         });
         setRouteSegments([]);
     };
@@ -1115,6 +1123,7 @@ function App() {
             setIsDraftDirty(true);
             const stop: PlanStop = {
                 label: suggestion.name,
+                displayName: suggestion.name,
                 description: suggestion.address ?? "",
                 placeId: suggestion.placeId,
                 latitude: suggestion.latitude,
@@ -1143,19 +1152,25 @@ function App() {
                 typeof selectIndex === "number"
                     ? Math.max(0, Math.min(selectIndex, prev.stops.length))
                     : prev.stops.length;
+            const normalizedStop: PlanStop = {
+                ...stop,
+                displayName:
+                    stop.displayName && stop.displayName.trim().length
+                        ? stop.displayName
+                        : stop.label,
+            };
             const nextStops = [
                 ...prev.stops.slice(0, idx),
-                stop,
+                normalizedStop,
                 ...prev.stops.slice(idx),
             ];
-            return { ...prev, stops: nextStops };
+            const updated = { ...prev, stops: nextStops };
+            if (options?.select) {
+                setSelectedStopRef({ planId: prev.id, index: idx });
+            }
+            return updated;
         });
         setRouteSegments([]);
-        if (options?.select) {
-            const planId = draftPlan?.id ?? "";
-            const index = options?.index ?? draftPlan?.stops.length ?? 0;
-            setSelectedStopRef({ planId, index });
-        }
     };
     const handleDraftUpdateStop = (
         stopIndex: number,
@@ -1316,8 +1331,10 @@ function App() {
                     return plan;
                 }
                 const nextIndex = plan.stops.length + 1;
+                const name = `New Stop ${nextIndex}`;
                 const newStop: PlanStop = {
-                    label: `New Stop ${nextIndex}`,
+                    label: name,
+                    displayName: name,
                     description: "",
                 };
                 return { ...plan, stops: [...plan.stops, newStop] };
@@ -1953,6 +1970,10 @@ function serializePlanForSave(plan: TravelPlan) {
 function serializeStopForSave(stop: PlanStop) {
     return {
         label: stop.label,
+        display_name:
+            typeof stop.displayName === "string" && stop.displayName.length
+                ? stop.displayName
+                : null,
         description: stop.description ?? "",
         place_id: stop.placeId ?? null,
         latitude: typeof stop.latitude === "number" ? stop.latitude : null,
@@ -1981,6 +2002,13 @@ function normalizePlan(plan: TravelPlanResponse): TravelPlan {
         createdAt: plan.createdAt,
         stops: plan.stops.map((stop, index) => ({
             label: stop.label,
+            displayName:
+                typeof stop.displayName === "string" && stop.displayName
+                    ? stop.displayName
+                    : typeof stop.display_name === "string" &&
+                      stop.display_name
+                    ? stop.display_name
+                    : stop.label,
             description: stop.description ?? undefined,
             placeId: stop.placeId ?? stop.place_id ?? undefined,
             latitude:

@@ -73,6 +73,10 @@ function ToGoList({
         {}
     );
     const previousCountRef = useRef(formStops.length);
+    const listRef = useRef<HTMLOListElement | null>(null);
+    const displayNameInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+    const itemRefs = useRef<(HTMLLIElement | null)[]>([]);
+    const pendingFocusIndexRef = useRef<number | null>(null);
     const autocompleteServiceRef =
         useRef<google.maps.places.AutocompleteService | null>(null);
     const placesServiceRef = useRef<google.maps.places.PlacesService | null>(
@@ -89,15 +93,45 @@ function ToGoList({
     useEffect(() => {
         setExpandedStops({});
         previousCountRef.current = formStops.length;
+        displayNameInputRefs.current = [];
+        itemRefs.current = [];
+        pendingFocusIndexRef.current = null;
     }, [plan?.id]);
 
     useEffect(() => {
         if (formStops.length > previousCountRef.current) {
             const newIndex = formStops.length - 1;
+            pendingFocusIndexRef.current = newIndex;
             setExpandedStops((prev) => ({ ...prev, [newIndex]: true }));
         }
         previousCountRef.current = formStops.length;
     }, [formStops.length, formStops]);
+
+    useEffect(() => {
+        const index = pendingFocusIndexRef.current;
+        if (index === null) {
+            return;
+        }
+        const input = displayNameInputRefs.current[index];
+        if (input) {
+            input.focus();
+            input.select();
+            input.scrollIntoView({ behavior: "smooth", block: "center" });
+        } else {
+            const item = itemRefs.current[index];
+            item?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        pendingFocusIndexRef.current = null;
+    }, [formStops, expandedStops]);
+
+    useEffect(() => {
+        if (displayNameInputRefs.current.length > formStops.length) {
+            displayNameInputRefs.current.length = formStops.length;
+        }
+        if (itemRefs.current.length > formStops.length) {
+            itemRefs.current.length = formStops.length;
+        }
+    }, [formStops.length]);
 
     const durationSummaries = useMemo(
         () =>
@@ -156,8 +190,23 @@ function ToGoList({
     };
 
     const handleLabelChange = (index: number, value: string) => {
-        onUpdateStop?.(index, { label: value });
+        const currentStop = formStops[index];
+        const trimmed = value;
+        const updates: Partial<PlanStop> = { label: trimmed };
+        const currentDisplay = currentStop?.displayName?.trim() ?? "";
+        const currentLabel = currentStop?.label ?? "";
+        if (!currentDisplay || currentDisplay === currentLabel) {
+            updates.displayName = trimmed;
+        }
+        onUpdateStop?.(index, updates);
         fetchPredictions(index, value);
+    };
+
+    const handleDisplayNameChange = (index: number, value: string) => {
+        const trimmed = value.trim();
+        onUpdateStop?.(index, {
+            displayName: trimmed.length ? trimmed : undefined,
+        });
     };
 
     const handleDescriptionChange = (index: number, value: string) => {
@@ -368,9 +417,19 @@ function ToGoList({
     ) => {
         updatePredictions(index, null);
 
+        const existingStop = formStops[index];
         const applySelection = (data: Partial<PlanStop>) => {
+            const resolvedLabel =
+                data.label ?? prediction.structured_formatting.main_text;
+            const resolvedDisplay =
+                existingStop?.displayName && existingStop.displayName.trim()
+                    ? existingStop.displayName
+                    : data.displayName ??
+                      resolvedLabel ??
+                      prediction.description;
             onUpdateStop?.(index, {
-                label: data.label ?? prediction.structured_formatting.main_text,
+                label: resolvedLabel,
+                displayName: resolvedDisplay ?? resolvedLabel,
                 description:
                     data.description ??
                     prediction.structured_formatting.secondary_text ??
@@ -402,6 +461,7 @@ function ToGoList({
 
                 applySelection({
                     label: result.name ?? undefined,
+                    displayName: result.name ?? undefined,
                     description: result.formatted_address ?? undefined,
                     placeId: result.place_id ?? undefined,
                     latitude: result.geometry?.location?.lat(),
@@ -449,7 +509,7 @@ function ToGoList({
                 </button>
             </header>
 
-            <ol className="to-go__list">
+            <ol className="to-go__list" ref={listRef}>
                 {isLoading ? (
                     <li className="to-go__empty">Loading your stops…</li>
                 ) : allStopsLength ? (
@@ -494,6 +554,9 @@ function ToGoList({
                                 ]
                                     .filter(Boolean)
                                     .join(" ")}
+                                ref={(element) => {
+                                    itemRefs.current[index] = element;
+                                }}
                             >
                                 <div className="to-go__item-header">
                                     <button
@@ -513,8 +576,12 @@ function ToGoList({
                                         </span>
                                         <div className="to-go__item-text">
                                             <span className="to-go__title">
-                                                {displayStop.label ||
-                                                    "Untitled stop"}
+                                                {(
+                                                    editableStop.displayName ??
+                                                    displayStop.displayName ??
+                                                    displayStop.label ??
+                                                    "Untitled stop"
+                                                ).trim()}
                                             </span>
                                             {summary ? (
                                                 <span className="to-go__time-pill">
@@ -568,7 +635,29 @@ function ToGoList({
                                     }
                                 >
                                     <label className="to-go__field">
-                                        <span>Stop name</span>
+                                        <span>Display name</span>
+                                        <input
+                                            type="text"
+                                            value={
+                                                editableStop.displayName ?? ""
+                                            }
+                                            onChange={(event) =>
+                                                handleDisplayNameChange(
+                                                    index,
+                                                    event.target.value
+                                                )
+                                            }
+                                            placeholder="How should we refer to this stop?"
+                                            disabled={detailInputsDisabled}
+                                            ref={(element) => {
+                                                displayNameInputRefs.current[
+                                                    index
+                                                ] = element;
+                                            }}
+                                        />
+                                    </label>
+                                    <label className="to-go__field">
+                                        <span>Place name</span>
                                         <input
                                             type="text"
                                             value={editableStop.label}
