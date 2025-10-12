@@ -3,7 +3,7 @@ import { TravelPlan, RouteSegment, PlanStop } from "../App";
 import "./TripDetailPage.css";
 import "./TripDetailPage-print.css";
 
-// Single clean implementation — minimal and print-friendly
+// Updated implementation to match the vertical timeline design
 type TripDetailPageProps = {
     plan: TravelPlan;
     routeSegments: RouteSegment[];
@@ -37,6 +37,10 @@ export default function TripDetailPage({
         return formatTripDuration(minutes);
     }, [plan.stops, routeSegments]);
 
+    const handlePrint = () => {
+        window.print();
+    };
+
     return (
         <div className="trip-detail-page">
             <div className="trip-detail-overlay no-print" onClick={onClose} />
@@ -53,20 +57,66 @@ export default function TripDetailPage({
 
                 <main className="trip-detail-content">
                     <h2>Itinerary</h2>
-                    <ol>
-                        {plan.stops.map((s, idx) => (
-                            <li
-                                key={`${s.label || s.displayName}-${idx}`}
-                                className="trip-detail-stop"
-                            >
-                                <strong>{s.displayName || s.label}</strong>
-                                <div className="trip-detail-stop-meta">
-                                    {getStopTimeDetails(s)}
+                    <div className="trip-detail-timeline">
+                        {plan.stops.map((stop, index) => {
+                            const nextStop = plan.stops[index + 1];
+                            const stopSegments = routeSegments.filter(
+                                (s) => s.fromIndex === index
+                            );
+                            const travelInfo = getTravelInfo(stopSegments);
+
+                            return (
+                                <div
+                                    key={`${
+                                        stop.label || stop.displayName
+                                    }-${index}`}
+                                    className="trip-detail-stop"
+                                >
+                                    <div className="trip-detail-stop-marker">
+                                        <div className="trip-detail-stop-circle">
+                                            {index + 1}
+                                        </div>
+                                        {nextStop && (
+                                            <div className="trip-detail-stop-line"></div>
+                                        )}
+                                    </div>
+                                    <div className="trip-detail-stop-content">
+                                        <h3>
+                                            {stop.displayName || stop.label}
+                                        </h3>
+                                        {stop.description && (
+                                            <div className="trip-detail-stop-address">
+                                                {stop.description}
+                                            </div>
+                                        )}
+                                        {getStopTimeDetails(stop) && (
+                                            <div className="trip-detail-stop-time">
+                                                {getStopTimeDetails(stop)}
+                                            </div>
+                                        )}
+                                        {stop.notes && (
+                                            <div className="trip-detail-stop-notes">
+                                                {stop.notes}
+                                            </div>
+                                        )}
+
+                                        {nextStop && travelInfo && (
+                                            <div className="trip-detail-travel-info">
+                                                <div className="trip-detail-travel-mode">
+                                                    {getTravelModeIcon(
+                                                        stopSegments[0]?.mode
+                                                    )}
+                                                </div>
+                                                <div className="trip-detail-travel-time">
+                                                    {travelInfo}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                                {s.description && <p>{s.description}</p>}
-                            </li>
-                        ))}
-                    </ol>
+                            );
+                        })}
+                    </div>
                 </main>
 
                 <footer className="trip-detail-footer no-print">
@@ -74,7 +124,7 @@ export default function TripDetailPage({
                         Close
                     </button>
                     <button
-                        onClick={() => window.print()}
+                        onClick={handlePrint}
                         className="trip-detail-action primary"
                     >
                         Print Trip Details
@@ -122,4 +172,51 @@ function getStopTimeDetails(stop: PlanStop): string | null {
     )
         parts.push(`${stop.timeToSpendMinutes}m`);
     return parts.length ? parts.join(" ") : null;
+}
+
+function getTravelModeIcon(mode?: string): string {
+    switch (mode?.toLowerCase()) {
+        case "walking":
+        case "walk":
+            return "🚶";
+        case "bicycling":
+        case "bicycle":
+            return "🚲";
+        case "driving":
+        case "drive":
+            return "🚗";
+        case "transit":
+        case "bus":
+            return "🚍";
+        case "train":
+            return "🚆";
+        case "subway":
+            return "🚇";
+        default:
+            return "➡️";
+    }
+}
+
+function getTravelInfo(segments: RouteSegment[]): string | null {
+    if (!segments.length) return null;
+
+    let totalMinutes = 0;
+    let totalDistance = "";
+
+    for (const seg of segments) {
+        if (seg.durationText) {
+            const minutes = parseDurationToMinutes(seg.durationText);
+            if (minutes) totalMinutes += minutes;
+        }
+        if (seg.distanceText && !totalDistance) {
+            totalDistance = seg.distanceText;
+        }
+    }
+
+    if (totalMinutes === 0) return null;
+
+    const formattedDuration = formatTripDuration(totalMinutes);
+    return totalDistance
+        ? `${formattedDuration} • ${totalDistance}`
+        : formattedDuration;
 }

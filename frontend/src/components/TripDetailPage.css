@@ -115,13 +115,105 @@
 
 .trip-detail-content {
     padding: 1.5rem 2rem;
-    flex: 1;
+    flex: 1 1 auto;
 }
 
 .trip-detail-content h2 {
-    font-size: 1.3rem;
-    margin: 0 0 1.5rem;
-    color: #16192c;
+    margin: 0 0 1.5rem 0;
+    font-size: 1.2rem;
+    color: #333;
+}
+
+/* Timeline style for stops */
+.trip-detail-timeline {
+    position: relative;
+}
+
+.trip-detail-stop {
+    display: flex;
+    margin-bottom: 1.5rem;
+    position: relative;
+}
+
+.trip-detail-stop-marker {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-right: 1.5rem;
+    min-width: 32px;
+}
+
+.trip-detail-stop-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-color: #1a3cff;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    z-index: 2;
+}
+
+.trip-detail-stop-line {
+    position: absolute;
+    top: 32px;
+    left: 50%;
+    width: 2px;
+    height: calc(100% - 16px);
+    background-color: #ddd;
+    transform: translateX(-50%);
+    z-index: 1;
+}
+
+.trip-detail-stop-content {
+    flex: 1;
+    padding-bottom: 1rem;
+}
+
+.trip-detail-stop-content h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.trip-detail-stop-address {
+    color: #555;
+    margin-bottom: 0.5rem;
+    white-space: pre-line;
+}
+
+.trip-detail-stop-time {
+    color: #777;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+.trip-detail-stop-notes {
+    color: #555;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-style: italic;
+}
+
+.trip-detail-travel-info {
+    display: flex;
+    align-items: center;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px dashed #eee;
+}
+
+.trip-detail-travel-mode {
+    font-size: 1.2rem;
+    margin-right: 0.75rem;
+}
+
+.trip-detail-travel-time {
+    color: #666;
+    font-size: 0.9rem;
 }
 
 .trip-detail-stops {

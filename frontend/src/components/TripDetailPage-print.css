@@ -5,12 +5,22 @@
     }
 
     /* Show only trip detail content */
-    .trip-detail-content {
-        position: absolute;
+    .trip-detail-container {
+        position: relative;
         top: 0;
         left: 0;
         width: 100%;
         visibility: visible;
+        background: white;
+        box-shadow: none;
+        max-height: none;
+        overflow: visible;
+    }
+
+    .trip-detail-content {
+        visibility: visible;
+        padding-top: 2cm;
+        width: 100%;
     }
 
     .trip-detail-content * {
@@ -18,36 +28,50 @@
     }
 
     /* Hide UI elements not needed for print */
+    .no-print,
     .trip-detail-overlay,
     .trip-detail-close,
     .trip-detail-footer,
     body > *:not(.trip-detail-page),
     .app__sidebar,
     .app__tabs,
-    .app__map-tools {
+    .app__map-tools,
+    .app__map button,
+    .app__map .gm-style-mtc,
+    .app__map .gm-svpc,
+    .app__map .gm-style-cc {
         display: none !important;
     }
 
     /* Show the map for printing */
     .app__map {
-        visibility: visible;
-        position: fixed !important;
-        bottom: 0;
-        height: 50% !important;
+        visibility: visible !important;
+        display: block !important;
+        position: relative !important;
+        height: 10cm !important;
         width: 100% !important;
         page-break-before: always;
+        margin-top: 1cm;
     }
 
     .app__map * {
-        visibility: visible;
+        visibility: visible !important;
     }
 
-    /* Format the trip detail content */
-    .trip-detail-container {
-        background: white;
-        box-shadow: none;
-        max-height: none;
-        overflow: visible;
+    /* Hide Google Maps UI controls during print */
+    .gm-style-cc,
+    .gm-fullscreen-control,
+    .gm-bundled-control,
+    .gm-svpc {
+        display: none !important;
+    }
+
+    /* Format for print */
+    .trip-detail-page {
+        position: relative !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
         margin-bottom: 0;
         padding-bottom: 40px;
     }
