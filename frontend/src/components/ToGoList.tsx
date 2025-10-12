@@ -12,6 +12,7 @@ type ToGoListProps = {
     onAddStop?: () => void;
     onUpdateStop?: (index: number, updates: Partial<PlanStop>) => void;
     onRemoveStop?: (index: number) => void;
+    onMoveStop?: (fromIndex: number, toIndex: number) => void;
     onSave?: () => void;
     hasPendingChanges?: boolean;
 };
@@ -61,13 +62,11 @@ function ToGoList({
     onAddStop,
     onUpdateStop,
     onRemoveStop,
+    onMoveStop,
     onSave,
     hasPendingChanges = false,
 }: ToGoListProps) {
-    const planStops = plan?.stops ?? [];
-    const formStops = draftStops ?? planStops;
-    const allStopsLength = Math.max(planStops.length, formStops.length);
-    const hasPlan = Boolean(plan);
+    const formStops = draftStops ?? plan?.stops ?? [];
     const isEditable = Boolean(onUpdateStop);
     const [expandedStops, setExpandedStops] = useState<Record<number, boolean>>(
         {}
@@ -75,8 +74,13 @@ function ToGoList({
     const previousCountRef = useRef(formStops.length);
     const listRef = useRef<HTMLOListElement | null>(null);
     const displayNameInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+    const labelInputRefs = useRef<(HTMLInputElement | null)[]>([]);
     const itemRefs = useRef<(HTMLLIElement | null)[]>([]);
     const pendingFocusIndexRef = useRef<number | null>(null);
+    const activeFieldRef = useRef<{
+        index: number;
+        field: "display" | "label";
+    } | null>(null);
     const autocompleteServiceRef =
         useRef<google.maps.places.AutocompleteService | null>(null);
     const placesServiceRef = useRef<google.maps.places.PlacesService | null>(
@@ -89,6 +93,11 @@ function ToGoList({
     const requestIdRef = useRef(0);
     const loaderRef = useRef<Loader | null>(null);
     const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
+    const remapIndexAfterRemoval = (
+        currentIndex: number,
+        removedIndex: number
+    ) => (currentIndex > removedIndex ? currentIndex - 1 : currentIndex);
 
     useEffect(() => {
         setExpandedStops({});
@@ -143,11 +152,39 @@ function ToGoList({
         }
 
         pendingFocusIndexRef.current = null;
+        activeFieldRef.current = { index, field: "display" };
+    }, [formStops, expandedStops]);
+
+    useEffect(() => {
+        if (pendingFocusIndexRef.current !== null) {
+            return;
+        }
+        const active = activeFieldRef.current;
+        if (!active) {
+            return;
+        }
+        const target =
+            active.field === "display"
+                ? displayNameInputRefs.current[active.index]
+                : labelInputRefs.current[active.index];
+        if (target && document.activeElement !== target) {
+            const { value } = target;
+            const cursor = typeof value === "string" ? value.length : 0;
+            target.focus({ preventScroll: true });
+            try {
+                target.setSelectionRange(cursor, cursor);
+            } catch (error) {
+                // ignore selection errors on unfocusable inputs
+            }
+        }
     }, [formStops, expandedStops]);
 
     useEffect(() => {
         if (displayNameInputRefs.current.length > formStops.length) {
             displayNameInputRefs.current.length = formStops.length;
+        }
+        if (labelInputRefs.current.length > formStops.length) {
+            labelInputRefs.current.length = formStops.length;
         }
         if (itemRefs.current.length > formStops.length) {
             itemRefs.current.length = formStops.length;
@@ -155,38 +192,9 @@ function ToGoList({
     }, [formStops.length]);
 
     const durationSummaries = useMemo(
-        () =>
-            Array.from({ length: allStopsLength }).map((_, index) => {
-                const savedStop = planStops[index] ?? null;
-                const draftStop = formStops[index] ?? null;
-                const displayStop = savedStop ?? draftStop;
-                return displayStop ? durationLabel(displayStop) : null;
-            }),
-        [allStopsLength, planStops, formStops]
+        () => formStops.map((stop) => durationLabel(stop)),
+        [formStops]
     );
-
-    const removedOriginalIndices = useMemo(() => {
-        if (!planStops.length) {
-            return new Set<number>();
-        }
-        const presentIndices = new Set<number>();
-        formStops.forEach((stop) => {
-            if (stop && typeof stop.__originalIndex === "number") {
-                presentIndices.add(stop.__originalIndex);
-            }
-        });
-        const removed = new Set<number>();
-        planStops.forEach((stop, index) => {
-            const originalIndex =
-                typeof stop.__originalIndex === "number"
-                    ? stop.__originalIndex
-                    : index;
-            if (!presentIndices.has(originalIndex)) {
-                removed.add(originalIndex);
-            }
-        });
-        return removed;
-    }, [planStops, formStops]);
 
     const predictionMap = useMemo(
         () => predictionStoreRef.current,
@@ -305,6 +313,8 @@ function ToGoList({
             return;
         }
         onSave?.();
+        // Collapse any open stop details after saving
+        setExpandedStops({});
     };
 
     const handleAddStopClick = () => {
@@ -326,20 +336,27 @@ function ToGoList({
                 if (currentIndex === index) {
                     return;
                 }
-                const newIndex =
-                    currentIndex > index ? currentIndex - 1 : currentIndex;
+                const newIndex = remapIndexAfterRemoval(currentIndex, index);
                 if (value) {
                     next[newIndex] = true;
                 }
             });
             return next;
         });
-        if (predictionStoreRef.current[index]) {
-            const next = { ...predictionStoreRef.current };
-            delete next[index];
-            predictionStoreRef.current = next;
-            setPredictionTick((tick) => tick + 1);
-        }
+        const nextPredictionStore: Record<
+            number,
+            google.maps.places.AutocompletePrediction[]
+        > = {};
+        Object.entries(predictionStoreRef.current).forEach(([key, value]) => {
+            const currentIndex = Number(key);
+            if (currentIndex === index) {
+                return;
+            }
+            const newIndex = remapIndexAfterRemoval(currentIndex, index);
+            nextPredictionStore[newIndex] = value;
+        });
+        predictionStoreRef.current = nextPredictionStore;
+        setPredictionTick((tick) => tick + 1);
     };
 
     const handleSelectStopClick = (stop: PlanStop, index: number) => {
@@ -535,45 +552,29 @@ function ToGoList({
             <ol className="to-go__list" ref={listRef}>
                 {isLoading ? (
                     <li className="to-go__empty">Loading your stops…</li>
-                ) : allStopsLength ? (
-                    Array.from({ length: allStopsLength }).map((_, index) => {
-                        const savedStop = planStops[index] ?? null;
-                        const draftStop = formStops[index] ?? null;
-                        if (!savedStop && !draftStop) {
-                            return null;
-                        }
-                        const originalIndex =
-                            savedStop && typeof savedStop.__originalIndex === "number"
-                                ? savedStop.__originalIndex
-                                : savedStop
-                                ? index
-                                : null;
-                        const isRemoved =
-                            typeof originalIndex === "number"
-                                ? removedOriginalIndices.has(originalIndex)
-                                : false;
-                        const displayStop = savedStop ?? draftStop!;
-                        const editableStop = isRemoved
-                            ? savedStop!
-                            : draftStop ?? savedStop!;
+                ) : formStops.length ? (
+                    formStops.map((stop, index) => {
                         const isSelected = selectedStopIndex === index;
                         const isExpanded = expandedStops[index] ?? false;
                         const summary = durationSummaries[index];
-                        const isNew = !savedStop && Boolean(draftStop);
-                        const detailInputsDisabled =
-                            inputsDisabled || isRemoved;
+                        const isNew = typeof stop.__originalIndex !== "number";
+                        const displayTitle =
+                            (stop.displayName ?? stop.label ?? "").trim() ||
+                            "Untitled stop";
+                        const detailInputsDisabled = inputsDisabled;
 
                         return (
                             <li
-                                key={`${plan?.id ?? "plan"}-${index}`}
+                                key={`${plan?.id ?? "plan"}-${
+                                    stop.__originalIndex ??
+                                    stop.placeId ??
+                                    `${index}-${stop.label}`
+                                }`}
                                 className={[
                                     "to-go__item",
                                     isSelected ? "to-go__item--selected" : "",
                                     isExpanded ? "to-go__item--open" : "",
                                     isNew ? "to-go__item--draft-new" : "",
-                                    isRemoved
-                                        ? "to-go__item--draft-removed"
-                                        : "",
                                 ]
                                     .filter(Boolean)
                                     .join(" ")}
@@ -585,12 +586,8 @@ function ToGoList({
                                     <button
                                         type="button"
                                         className="to-go__item-select"
-                                        disabled={isRemoved}
                                         onClick={() =>
-                                            handleSelectStopClick(
-                                                editableStop,
-                                                index
-                                            )
+                                            handleSelectStopClick(stop, index)
                                         }
                                         aria-pressed={isSelected}
                                     >
@@ -599,12 +596,7 @@ function ToGoList({
                                         </span>
                                         <div className="to-go__item-text">
                                             <span className="to-go__title">
-                                                {(
-                                                    editableStop.displayName ??
-                                                    displayStop.displayName ??
-                                                    displayStop.label ??
-                                                    "Untitled stop"
-                                                ).trim()}
+                                                {displayTitle}
                                             </span>
                                             {summary ? (
                                                 <span className="to-go__time-pill">
@@ -616,11 +608,6 @@ function ToGoList({
                                                     New
                                                 </span>
                                             ) : null}
-                                            {isRemoved ? (
-                                                <span className="to-go__chip to-go__chip--removed">
-                                                    Removed
-                                                </span>
-                                            ) : null}
                                         </div>
                                     </button>
                                     <div className="to-go__item-actions">
@@ -630,7 +617,6 @@ function ToGoList({
                                             onClick={() =>
                                                 toggleStopDetails(index)
                                             }
-                                            disabled={isRemoved}
                                             aria-expanded={isExpanded}
                                         >
                                             {isExpanded ? "Hide" : "Details"}
@@ -661,9 +647,7 @@ function ToGoList({
                                         <span>Display name</span>
                                         <input
                                             type="text"
-                                            value={
-                                                editableStop.displayName ?? ""
-                                            }
+                                            value={stop.displayName ?? ""}
                                             onChange={(event) =>
                                                 handleDisplayNameChange(
                                                     index,
@@ -677,13 +661,19 @@ function ToGoList({
                                                     index
                                                 ] = element;
                                             }}
+                                            onFocus={() => {
+                                                activeFieldRef.current = {
+                                                    index,
+                                                    field: "display",
+                                                };
+                                            }}
                                         />
                                     </label>
                                     <label className="to-go__field">
                                         <span>Place name</span>
                                         <input
                                             type="text"
-                                            value={editableStop.label}
+                                            value={stop.label}
                                             onChange={(event) =>
                                                 handleLabelChange(
                                                     index,
@@ -692,6 +682,16 @@ function ToGoList({
                                             }
                                             placeholder="Enter stop name"
                                             disabled={detailInputsDisabled}
+                                            ref={(element) => {
+                                                labelInputRefs.current[index] =
+                                                    element;
+                                            }}
+                                            onFocus={() => {
+                                                activeFieldRef.current = {
+                                                    index,
+                                                    field: "label",
+                                                };
+                                            }}
                                         />
                                     </label>
 
@@ -749,9 +749,7 @@ function ToGoList({
                                     <label className="to-go__field">
                                         <span>Notes</span>
                                         <textarea
-                                            value={
-                                                editableStop.description ?? ""
-                                            }
+                                            value={stop.description ?? ""}
                                             onChange={(event) =>
                                                 handleDescriptionChange(
                                                     index,
@@ -768,7 +766,7 @@ function ToGoList({
                                         <span>Place ID (optional)</span>
                                         <input
                                             type="text"
-                                            value={editableStop.placeId ?? ""}
+                                            value={stop.placeId ?? ""}
                                             onChange={(event) =>
                                                 handlePlaceIdChange(
                                                     index,
@@ -787,8 +785,7 @@ function ToGoList({
                                                 type="number"
                                                 min="0"
                                                 value={
-                                                    editableStop.timeToSpendDays ??
-                                                    ""
+                                                    stop.timeToSpendDays ?? ""
                                                 }
                                                 onChange={(event) =>
                                                     handleTimePieceChange(
@@ -808,8 +805,7 @@ function ToGoList({
                                                 min="0"
                                                 max="23"
                                                 value={
-                                                    editableStop.timeToSpendHours ??
-                                                    ""
+                                                    stop.timeToSpendHours ?? ""
                                                 }
                                                 onChange={(event) =>
                                                     handleTimePieceChange(
@@ -829,7 +825,7 @@ function ToGoList({
                                                 min="0"
                                                 max="59"
                                                 value={
-                                                    editableStop.timeToSpendMinutes ??
+                                                    stop.timeToSpendMinutes ??
                                                     ""
                                                 }
                                                 onChange={(event) =>
@@ -860,10 +856,7 @@ function ToGoList({
                                             <span>Address</span>
                                             <input
                                                 type="text"
-                                                value={
-                                                    editableStop.description ??
-                                                    ""
-                                                }
+                                                value={stop.description ?? ""}
                                                 onChange={(event) =>
                                                     handleDescriptionChange(
                                                         index,
