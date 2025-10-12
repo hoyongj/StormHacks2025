@@ -120,7 +120,9 @@ export type Folder = {
 const FOLDER_STORAGE_PREFIX = "plan-folders";
 
 function folderStorageKey(email: string | null): string {
-    return email ? `${FOLDER_STORAGE_PREFIX}:${email}` : `${FOLDER_STORAGE_PREFIX}:guest`;
+    return email
+        ? `${FOLDER_STORAGE_PREFIX}:${email}`
+        : `${FOLDER_STORAGE_PREFIX}:guest`;
 }
 
 function loadStoredFolders(email: string | null): Folder[] {
@@ -147,7 +149,8 @@ function loadStoredFolders(email: string | null): Folder[] {
                 Array.isArray(item.planIds)
             ) {
                 const planIds = item.planIds.filter(
-                    (value: unknown): value is string => typeof value === "string"
+                    (value: unknown): value is string =>
+                        typeof value === "string"
                 );
                 folders.push({ id: item.id, name: item.name, planIds });
             }
@@ -390,9 +393,7 @@ function App() {
         if (stored) return stored;
         // default if nothing stored
         return {
-            name: initialEmail
-                ? initialEmail.split("@")[0]
-                : "Jamie Hoang",
+            name: initialEmail ? initialEmail.split("@")[0] : "Jamie Hoang",
             email: initialEmail ?? "jamie.hoang@example.com",
         };
     });
@@ -666,7 +667,9 @@ function App() {
                     changed = true;
                     return { ...folder, planIds };
                 }
-                const filtered = folder.planIds.filter((id) => validIds.has(id));
+                const filtered = folder.planIds.filter((id) =>
+                    validIds.has(id)
+                );
                 if (arraysShallowEqual(filtered, folder.planIds)) {
                     return folder;
                 }
@@ -816,8 +819,10 @@ function App() {
         "Relaxation",
     ];
 
-    const isModalValid =
-        startDate.trim() && endDate.trim() && motivation.length > 0;
+    // Start date, end date, and motivation are optional now — allow creating a plan
+    // even when those fields are empty. The plan will default to "Untitled Plan"
+    // and a blank summary when omitted.
+    const isModalValid = true;
 
     useEffect(() => {
         return () => {
@@ -906,9 +911,7 @@ function App() {
 
         setPlans((prev) =>
             prev.map((plan) =>
-                plan.id === planId
-                    ? { ...plan, summary: nextSummary }
-                    : plan
+                plan.id === planId ? { ...plan, summary: nextSummary } : plan
             )
         );
 
@@ -1470,8 +1473,14 @@ function App() {
         }
         const nextTitle = title ?? "";
         if (existing.title === nextTitle) {
-            if (draftPlan && draftPlan.id === planId && draftPlan.title !== nextTitle) {
-                setDraftPlan((prev) => (prev ? { ...prev, title: nextTitle } : prev));
+            if (
+                draftPlan &&
+                draftPlan.id === planId &&
+                draftPlan.title !== nextTitle
+            ) {
+                setDraftPlan((prev) =>
+                    prev ? { ...prev, title: nextTitle } : prev
+                );
             }
             return;
         }
@@ -1510,9 +1519,7 @@ function App() {
                 draftPlan.id === planId &&
                 draftPlan.createdAt !== createdAt
             ) {
-                setDraftPlan((prev) =>
-                    prev ? { ...prev, createdAt } : prev
-                );
+                setDraftPlan((prev) => (prev ? { ...prev, createdAt } : prev));
             }
             return;
         }
@@ -1524,9 +1531,7 @@ function App() {
         );
 
         if (draftPlan && draftPlan.id === planId) {
-            setDraftPlan((prev) =>
-                prev ? { ...prev, createdAt } : prev
-            );
+            setDraftPlan((prev) => (prev ? { ...prev, createdAt } : prev));
         }
 
         schedulePlanPersist(planId);
@@ -1813,18 +1818,7 @@ function App() {
                                 Save Plan
                             </button>
                         </div>
-                        {modalTouched && !isModalValid && (
-                            <div
-                                style={{
-                                    color: "red",
-                                    marginTop: 8,
-                                    fontSize: 13,
-                                }}
-                            >
-                                Please choose start and end dates and select at
-                                least one motivation.
-                            </div>
-                        )}
+                        {/* Dates and motivations are optional now; no validation message needed. */}
                     </div>
                 </div>
             )}

@@ -12883,7 +12883,8 @@ function Nm() {
             "Scenery",
             "Relaxation",
         ],
-        ri = U.trim() && oe.trim() && ze.length > 0;
+        // Start date, end date, and motivations are optional now.
+        ri = true;
     k.useEffect(
         () => () => {
             Bn.current && window.clearTimeout(Bn.current),
@@ -13408,17 +13409,7 @@ function Nm() {
                                         }),
                                     ],
                                 }),
-                                Yt &&
-                                    !ri &&
-                                    u.jsx("div", {
-                                        style: {
-                                            color: "red",
-                                            marginTop: 8,
-                                            fontSize: 13,
-                                        },
-                                        children:
-                                            "Please choose start and end dates and select at least one motivation.",
-                                    }),
+                                /* Dates and motivations are optional now. */
                             ],
                         }),
                     }),
