@@ -244,6 +244,10 @@ function ToGoList({
         onUpdateStop?.(index, { description: value.length ? value : "" });
     };
 
+    const handleNotesChange = (index: number, value: string) => {
+        onUpdateStop?.(index, { notes: value.length ? value : "" });
+    };
+
     const handlePlaceIdChange = (index: number, value: string) => {
         const trimmed = value.trim();
         onUpdateStop?.(index, { placeId: trimmed || undefined });
@@ -749,9 +753,9 @@ function ToGoList({
                                     <label className="to-go__field">
                                         <span>Notes</span>
                                         <textarea
-                                            value={stop.description ?? ""}
+                                            value={stop.notes ?? ""}
                                             onChange={(event) =>
-                                                handleDescriptionChange(
+                                                handleNotesChange(
                                                     index,
                                                     event.target.value
                                                 )
@@ -857,14 +861,10 @@ function ToGoList({
                                             <input
                                                 type="text"
                                                 value={stop.description ?? ""}
-                                                onChange={(event) =>
-                                                    handleDescriptionChange(
-                                                        index,
-                                                        event.target.value
-                                                    )
-                                                }
+                                                readOnly={true}
                                                 placeholder="123 Example St, Vancouver, BC"
                                                 disabled={detailInputsDisabled}
+                                                className="to-go__field--readonly"
                                             />
                                         </label>
                                     </div>

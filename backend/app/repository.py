@@ -50,6 +50,7 @@ def init_db() -> None:
         _ensure_column(conn, "plan_stops", "latitude", "REAL")
         _ensure_column(conn, "plan_stops", "longitude", "REAL")
         _ensure_column(conn, "plan_stops", "display_label", "TEXT")
+        _ensure_column(conn, "plan_stops", "notes", "TEXT")
         _ensure_column(conn, "plan_stops", "time_days", "INTEGER")
         _ensure_column(conn, "plan_stops", "time_hours", "INTEGER")
         _ensure_column(conn, "plan_stops", "time_minutes", "INTEGER")
@@ -145,14 +146,15 @@ def save_plan(plan: TravelPlan, owner_id: Optional[str]) -> None:
         for position, stop in enumerate(plan.stops):
             conn.execute(
                 """
-                INSERT INTO plan_stops (plan_id, label, display_label, description, place_id, position, latitude, longitude, time_days, time_hours, time_minutes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO plan_stops (plan_id, label, display_label, description, notes, place_id, position, latitude, longitude, time_days, time_hours, time_minutes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     plan.id,
                     stop.label,
                     stop.display_name,
                     stop.description,
+                    stop.notes,
                     stop.place_id,
                     position,
                     stop.latitude,
@@ -218,7 +220,7 @@ def delete_plan(plan_id: str, owner_id: str) -> bool:
 def _fetch_stops(conn: sqlite3.Connection, plan_id: str) -> List[PlanStop]:
     stop_rows = conn.execute(
         """
-        SELECT label, display_label, description, place_id, latitude, longitude, time_days, time_hours, time_minutes
+        SELECT label, display_label, description, notes, place_id, latitude, longitude, time_days, time_hours, time_minutes
         FROM plan_stops
         WHERE plan_id = ?
         ORDER BY position ASC
@@ -228,16 +230,17 @@ def _fetch_stops(conn: sqlite3.Connection, plan_id: str) -> List[PlanStop]:
     return [
         PlanStop(
             label=label,
-            display_name=display_label,
+            displayName=display_label,
             description=description,
+            notes=notes,
             place_id=place_id,
             latitude=latitude,
             longitude=longitude,
-            time_to_spend_days=time_days,
-            time_to_spend_hours=time_hours,
-            time_to_spend_minutes=time_minutes,
+            timeToSpendDays=time_days,
+            timeToSpendHours=time_hours,
+            timeToSpendMinutes=time_minutes,
         )
-        for label, display_label, description, place_id, latitude, longitude, time_days, time_hours, time_minutes in stop_rows
+        for label, display_label, description, notes, place_id, latitude, longitude, time_days, time_hours, time_minutes in stop_rows
     ]
 
 

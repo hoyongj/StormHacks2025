@@ -16,7 +16,14 @@ class PlanStop(BaseModel):
         alias="displayName",
         description="Optional display label chosen by the user",
     )
-    description: Optional[str] = None
+    description: Optional[str] = Field(
+        default=None, 
+        description="Address or location description"
+    )
+    notes: Optional[str] = Field(
+        default=None,
+        description="User notes for this stop"
+    )
     place_id: Optional[str] = Field(
         default=None,
         description="Optional place identifier (e.g., Google Place ID)",

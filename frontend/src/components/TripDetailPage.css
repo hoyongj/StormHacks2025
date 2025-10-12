@@ -1,0 +1,434 @@
+.trip-detail-page {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    overflow: hidden;
+}
+
+.trip-detail-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+}
+
+.trip-detail-container {
+    position: relative;
+    background: #ffffff;
+    border-radius: 20px;
+    width: 85%;
+    max-width: 900px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: column;
+    animation: slide-up 0.3s ease-out;
+}
+
+@keyframes slide-up {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.trip-detail-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 1.5rem 2rem;
+    background: linear-gradient(135deg, #7f5af0, #2cb1bc);
+    border-radius: 20px 20px 0 0;
+    color: white;
+}
+
+.trip-detail-close {
+    background: rgba(255, 255, 255, 0.25);
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    font-size: 1.4rem;
+    line-height: 1;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.trip-detail-close:hover {
+    background: rgba(255, 255, 255, 0.4);
+}
+
+.trip-detail-title {
+    flex: 1;
+}
+
+.trip-detail-title h1 {
+    margin: 0;
+    font-size: 1.8rem;
+    font-weight: 700;
+}
+
+.trip-detail-meta {
+    margin: 0.4rem 0 0;
+    font-size: 0.85rem;
+    opacity: 0.85;
+}
+
+.trip-detail-summary {
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.trip-detail-summary h2 {
+    font-size: 1.3rem;
+    margin: 0 0 0.8rem;
+    color: #16192c;
+}
+
+.trip-detail-summary p {
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.6;
+    color: #4d4d6d;
+}
+
+.trip-detail-content {
+    padding: 1.5rem 2rem;
+    flex: 1;
+}
+
+.trip-detail-content h2 {
+    font-size: 1.3rem;
+    margin: 0 0 1.5rem;
+    color: #16192c;
+}
+
+.trip-detail-stops {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.75rem;
+}
+
+.trip-detail-stop {
+    position: relative;
+    display: grid;
+    grid-template-columns: 36px 1fr;
+    gap: 1.25rem;
+    padding: 1.25rem;
+    border-radius: 16px;
+    background: #f9f9ff;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
+}
+
+.trip-detail-stop-marker {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.trip-detail-stop-node {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #1d2145;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.9rem;
+    box-shadow: 0 2px 8px rgba(29, 33, 69, 0.25);
+}
+
+.trip-detail-stop-line {
+    position: absolute;
+    top: 36px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: calc(100% + 0.75rem);
+    background: repeating-linear-gradient(
+        to bottom,
+        rgba(127, 90, 240, 0.6),
+        rgba(127, 90, 240, 0.6) 8px,
+        rgba(127, 90, 240, 0.2) 8px,
+        rgba(127, 90, 240, 0.2) 16px
+    );
+}
+
+.trip-detail-stop-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.trip-detail-stop-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.trip-detail-stop-title {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #16192c;
+}
+
+.trip-detail-stop-time {
+    background: rgba(127, 90, 240, 0.12);
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #7f5af0;
+    white-space: nowrap;
+}
+
+.trip-detail-stop-desc {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: #4d4d6d;
+}
+
+.trip-detail-stop-location {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    font-size: 0.85rem;
+    color: #7f7f92;
+}
+
+.trip-detail-location-label {
+    font-weight: 600;
+}
+
+.trip-detail-transit {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px dashed rgba(127, 90, 240, 0.3);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.trip-detail-transit-header {
+    display: grid;
+    grid-template-columns: 38px 1fr;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.trip-detail-transit-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: rgba(32, 61, 255, 0.12);
+    border: 1px solid rgba(32, 61, 255, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: rgba(32, 61, 255, 0.85);
+}
+
+.trip-detail-transit-icon.walking {
+    background: rgba(46, 184, 92, 0.12);
+    border-color: rgba(46, 184, 92, 0.35);
+    color: rgba(46, 184, 92, 0.85);
+}
+
+.trip-detail-transit-icon.bicycling {
+    background: rgba(245, 158, 11, 0.12);
+    border-color: rgba(245, 158, 11, 0.35);
+    color: rgba(245, 158, 11, 0.85);
+}
+
+.trip-detail-transit-icon.driving {
+    background: rgba(239, 68, 68, 0.12);
+    border-color: rgba(239, 68, 68, 0.35);
+    color: rgba(239, 68, 68, 0.85);
+}
+
+.trip-detail-transit-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.trip-detail-transit-mode {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #16192c;
+}
+
+.trip-detail-transit-metrics {
+    font-size: 0.85rem;
+    color: #7f7f92;
+}
+
+.trip-detail-transit-segments {
+    margin-left: 38px;
+    padding-left: 0.75rem;
+    border-left: 1px dashed rgba(32, 61, 255, 0.35);
+}
+
+.trip-detail-transit-segments h4 {
+    font-size: 0.85rem;
+    margin: 0 0 0.75rem;
+    color: #7f7f92;
+    font-weight: 600;
+}
+
+.trip-detail-transit-steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.5rem;
+}
+
+.trip-detail-transit-step {
+    background: rgba(255, 255, 255, 0.7);
+    padding: 0.75rem;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.trip-detail-step-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.trip-detail-step-mode {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #16192c;
+}
+
+.trip-detail-step-duration {
+    font-size: 0.8rem;
+    color: #7f7f92;
+}
+
+.trip-detail-step-instructions {
+    margin: 0;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: #4d4d6d;
+}
+
+.trip-detail-footer {
+    position: sticky;
+    bottom: 0;
+    padding: 1rem 2rem;
+    background: #ffffff;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 0 0 20px 20px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+}
+
+.trip-detail-action {
+    padding: 0.6rem 1.25rem;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.trip-detail-action:not(.primary) {
+    background: #f1f1f8;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    color: #16192c;
+}
+
+.trip-detail-action:not(.primary):hover {
+    background: #e6e6f0;
+}
+
+.trip-detail-action.primary {
+    background: linear-gradient(135deg, #7f5af0, #2cb1bc);
+    border: none;
+    color: white;
+    box-shadow: 0 4px 12px rgba(127, 90, 240, 0.22);
+}
+
+.trip-detail-action.primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(127, 90, 240, 0.28);
+}
+
+/* Print styles */
+@media print {
+    .trip-detail-page {
+        position: relative;
+        overflow: visible;
+        display: block;
+    }
+
+    .trip-detail-overlay {
+        display: none;
+    }
+
+    .trip-detail-container {
+        width: 100%;
+        max-height: none;
+        overflow: visible;
+        box-shadow: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    .trip-detail-close,
+    .trip-detail-footer {
+        display: none;
+    }
+
+    .trip-detail-header {
+        background: white;
+        color: #16192c;
+        page-break-after: avoid;
+    }
+
+    .trip-detail-stop {
+        break-inside: avoid;
+    }
+
+    .trip-detail-transit {
+        break-inside: avoid;
+    }
+}

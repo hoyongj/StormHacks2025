@@ -10,6 +10,7 @@ type InfoPanelProps = {
     onUpdatePlanTitle: (planId: string, title: string) => void;
     onUpdatePlanSummary: (planId: string, summary: string) => void;
     onDeletePlan: (planId: string) => void;
+    onViewDetails?: () => void;
     routeSegments: RouteSegment[];
     folders: Folder[];
     selectedFolderId: string;
@@ -27,6 +28,7 @@ function InfoPanel({
     onUpdatePlanTitle,
     onUpdatePlanSummary,
     onDeletePlan,
+    onViewDetails,
     routeSegments,
 }: InfoPanelProps) {
     const handleTitleChange = (value: string) => {
@@ -123,14 +125,14 @@ function InfoPanel({
                         : null;
 
                     const pieces: string[] = [];
-                    const stopTitle = stop.displayName || stop.label || "Untitled stop";
+                    const stopTitle =
+                        stop.displayName || stop.label || "Untitled stop";
                     pieces.push(
-                        `<h3>${escapeHtml(
-                            `${index + 1}. ${stopTitle}`
-                        )}</h3>`
+                        `<h3>${escapeHtml(`${index + 1}. ${stopTitle}`)}</h3>`
                     );
-                    if (stop.description) {
-                        pieces.push(`<p>${escapeHtml(stop.description)}</p>`);
+                    const stopText = stop.notes || stop.description;
+                    if (stopText) {
+                        pieces.push(`<p>${escapeHtml(stopText)}</p>`);
                     }
                     if (travelSummary) {
                         pieces.push(
@@ -252,6 +254,13 @@ function InfoPanel({
                             </button>
                             <button
                                 type="button"
+                                className="info__view-details"
+                                onClick={() => onViewDetails && onViewDetails()}
+                            >
+                                View Details
+                            </button>
+                            <button
+                                type="button"
                                 className="info__delete-plan"
                                 onClick={() => onDeletePlan(plan.id)}
                             >
@@ -296,7 +305,9 @@ function InfoPanel({
                             ).slice(0, 1);
 
                             const stopTitle =
-                                stop.displayName || stop.label || "Untitled stop";
+                                stop.displayName ||
+                                stop.label ||
+                                "Untitled stop";
                             return (
                                 <li
                                     key={`${stopTitle}-${index}`}
@@ -312,9 +323,9 @@ function InfoPanel({
                                         <span className="info__stop-title">
                                             {stopTitle}
                                         </span>
-                                        {stop.description ? (
+                                        {stop.notes || stop.description ? (
                                             <span className="info__stop-desc">
-                                                {stop.description}
+                                                {stop.notes || stop.description}
                                             </span>
                                         ) : null}
                                         {travelSummary ? (

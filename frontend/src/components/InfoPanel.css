@@ -121,6 +121,23 @@
     box-shadow: 0 6px 16px rgba(127, 90, 240, 0.28);
 }
 
+.info__view-details {
+    border: none;
+    background: #16192c;
+    color: #ffffff;
+    padding: 0.5rem 1rem;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(22, 25, 44, 0.22);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.info__view-details:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(22, 25, 44, 0.28);
+}
+
 .info__delete-plan {
     align-self: flex-start;
     border: 1px solid rgba(228, 56, 94, 0.3);

@@ -13,13 +13,15 @@ import AiAssistantPanel from "./components/AiAssistantPanel";
 import ToGoList from "./components/ToGoList";
 import PlanManager from "./components/PlanManager";
 import AdminPanel from "./components/AdminPanel";
+import TripDetailPage from "./components/TripDetailPage";
 import "./App.css";
 import AuthPage from "./components/AuthPage";
 
 export type PlanStop = {
     label: string;
     displayName?: string;
-    description?: string;
+    description?: string; // This will now be used for address only
+    notes?: string;       // New field for notes
     placeId?: string;
     latitude?: number;
     longitude?: number;
@@ -364,6 +366,7 @@ function App() {
         index: number;
     } | null>(null);
     const [routeSegments, setRouteSegments] = useState<RouteSegment[]>([]);
+    const [showTripDetail, setShowTripDetail] = useState<boolean>(false);
     const [mapMode, setMapMode] = useState<MapMode>(() => {
         if (typeof window === "undefined") {
             return "single";
@@ -1857,6 +1860,7 @@ function App() {
                             onUpdatePlanTitle={handleUpdatePlanTitle}
                             onUpdatePlanSummary={handlePlanSummaryChange}
                             onDeletePlan={handleDeletePlan}
+                            onViewDetails={() => setShowTripDetail(true)}
                             routeSegments={routeSegments}
                         />
                     </aside>
@@ -1956,6 +1960,14 @@ function App() {
                     onUpdateProfile={handleUpdateProfile}
                 />
             )}
+
+            {showTripDetail && selectedPlan && (
+                <TripDetailPage
+                    plan={selectedPlan}
+                    routeSegments={routeSegments}
+                    onClose={() => setShowTripDetail(false)}
+                />
+            )}
         </div>
     );
 }
@@ -2020,8 +2032,7 @@ function normalizePlan(plan: TravelPlanResponse): TravelPlan {
             displayName:
                 typeof stop.displayName === "string" && stop.displayName
                     ? stop.displayName
-                    : typeof stop.display_name === "string" &&
-                      stop.display_name
+                    : typeof stop.display_name === "string" && stop.display_name
                     ? stop.display_name
                     : stop.label,
             description: stop.description ?? undefined,

@@ -359,9 +359,17 @@
 
 .to-go__field input:disabled,
 .to-go__field textarea:disabled {
-    background: #f3f5ff;
-    border-color: rgba(127, 90, 240, 0.12);
-    color: #7c7f9a;
+    background-color: #f8fafc;
+    color: #94a3b8;
+    cursor: not-allowed;
+}
+
+/* New class for readonly address field */
+.to-go__field--readonly {
+    background-color: #f1f5f9;
+    color: #64748b;
+    border-style: dashed;
+    cursor: not-allowed;
 }
 
 .to-go__field-grid {
