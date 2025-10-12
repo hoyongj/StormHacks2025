@@ -1,4 +1,37 @@
 /* --- ToGoList Panel --- */
+
+.to-go__item-header {
+    display: flex;
+    align-items: center;
+    gap: 8px; /* tighten spacing between handle and content */
+}
+
+.to-go__drag-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    background: transparent;
+    border: 0;
+    color: #666;
+    line-height: 1;
+    padding: 4px 6px;
+    margin: 0 4px 0 0;
+    border-radius: 4px;
+    font-size: 16px;
+    transition: all 0.2s;
+}
+
+.to-go__drag-handle:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #333;
+}
+
+.to-go__drag-handle:active {
+    cursor: grabbing;
+    background: rgba(0, 0, 0, 0.1);
+    color: #000;
+}
 .to-go {
     background: #fff;
     border-radius: 18px;

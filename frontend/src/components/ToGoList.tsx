@@ -1,7 +1,366 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+    DndContext,
+    KeyboardSensor,
+    PointerSensor,
+    type DragEndEvent,
+    useSensor,
+    useSensors,
+} from "@dnd-kit/core";
+import {
+    SortableContext,
+    sortableKeyboardCoordinates,
+    useSortable,
+    verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import { CSS } from "@dnd-kit/utilities";
 import { Loader } from "@googlemaps/js-api-loader";
 import type { PlanStop, TravelPlan } from "../App";
 import "./ToGoList.css";
+
+// Sortable item component for drag and drop functionality
+interface SortableStopItemProps {
+    id: string;
+    index: number;
+    rank: number;
+    isSelected: boolean;
+    isExpanded: boolean;
+    summary: string | null;
+    isNew: boolean;
+    displayTitle: string;
+    detailInputsDisabled: boolean;
+    stop: PlanStop;
+    handleSelectStopClick: (stop: PlanStop, index: number) => void;
+    toggleStopDetails: (index: number) => void;
+    handleRemoveStopClick: (index: number) => void;
+    handleDisplayNameChange: (index: number, value: string) => void;
+    handleLabelChange: (index: number, value: string) => void;
+    predictionMap: Record<number, google.maps.places.AutocompletePrediction[]>;
+    handlePredictionSelect: (
+        index: number,
+        prediction: google.maps.places.AutocompletePrediction
+    ) => void;
+    handleNotesChange: (index: number, value: string) => void;
+    handlePlaceIdChange: (index: number, value: string) => void;
+    handleTimePieceChange: (
+        index: number,
+        field: "timeToSpendDays" | "timeToSpendHours" | "timeToSpendMinutes",
+        value: string
+    ) => void;
+    handleTimeClear: (index: number) => void;
+    displayNameInputRefs: React.MutableRefObject<(HTMLInputElement | null)[]>;
+    labelInputRefs: React.MutableRefObject<(HTMLInputElement | null)[]>;
+    itemRefs: React.MutableRefObject<(HTMLLIElement | null)[]>;
+    activeFieldRef: React.MutableRefObject<{
+        index: number;
+        field: "display" | "label";
+    } | null>;
+}
+
+function SortableStopItem({
+    id,
+    index,
+    rank,
+    isSelected,
+    isExpanded,
+    summary,
+    isNew,
+    displayTitle,
+    detailInputsDisabled,
+    stop,
+    handleSelectStopClick,
+    toggleStopDetails,
+    handleRemoveStopClick,
+    handleDisplayNameChange,
+    handleLabelChange,
+    predictionMap,
+    handlePredictionSelect,
+    handleNotesChange,
+    handlePlaceIdChange,
+    handleTimePieceChange,
+    handleTimeClear,
+    displayNameInputRefs,
+    labelInputRefs,
+    itemRefs,
+    activeFieldRef,
+}: SortableStopItemProps) {
+    console.log("Rendering SortableStopItem", { id, index });
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 10 : 0,
+        opacity: isDragging ? 0.8 : 1,
+    };
+
+    return (
+        <li
+            ref={(element) => {
+                setNodeRef(element);
+                itemRefs.current[index] = element;
+            }}
+            style={style}
+            className={[
+                "to-go__item",
+                isSelected ? "to-go__item--selected" : "",
+                isExpanded ? "to-go__item--open" : "",
+                isNew ? "to-go__item--draft-new" : "",
+                isDragging ? "to-go__item--dragging" : "",
+            ]
+                .filter(Boolean)
+                .join(" ")}
+            {...attributes}
+        >
+            <div className="to-go__item-header">
+                <button
+                    type="button"
+                    className="to-go__drag-handle"
+                    aria-label="Drag to reorder"
+                    {...listeners}
+                >
+                    <span aria-hidden="true">≡</span>
+                </button>
+                <button
+                    type="button"
+                    className="to-go__item-select"
+                    onClick={() => handleSelectStopClick(stop, index)}
+                    aria-pressed={isSelected}
+                >
+                    <span className="to-go__step">{rank + 1}</span>
+                    <div className="to-go__item-text">
+                        <span className="to-go__title">{displayTitle}</span>
+                        {summary ? (
+                            <span className="to-go__time-pill">{summary}</span>
+                        ) : null}
+                        {isNew ? (
+                            <span className="to-go__chip to-go__chip--new">
+                                New
+                            </span>
+                        ) : null}
+                    </div>
+                </button>
+                <div className="to-go__item-actions">
+                    <button
+                        type="button"
+                        className="to-go__action to-go__action--toggle"
+                        onClick={() => toggleStopDetails(index)}
+                        aria-expanded={isExpanded}
+                    >
+                        {isExpanded ? "Hide" : "Details"}
+                    </button>
+                    <button
+                        type="button"
+                        className="to-go__action to-go__action--danger"
+                        onClick={() => handleRemoveStopClick(index)}
+                        disabled={detailInputsDisabled}
+                    >
+                        -
+                    </button>
+                </div>
+            </div>
+
+            <div
+                className={
+                    isExpanded
+                        ? "to-go__item-details to-go__item-details--open"
+                        : "to-go__item-details"
+                }
+            >
+                <label className="to-go__field">
+                    <span>Display name</span>
+                    <input
+                        type="text"
+                        value={stop.displayName ?? ""}
+                        onChange={(event) =>
+                            handleDisplayNameChange(index, event.target.value)
+                        }
+                        placeholder="How should we refer to this stop?"
+                        disabled={detailInputsDisabled}
+                        ref={(element) => {
+                            displayNameInputRefs.current[index] = element;
+                        }}
+                        onFocus={() => {
+                            activeFieldRef.current = {
+                                index,
+                                field: "display",
+                            };
+                        }}
+                    />
+                </label>
+                <label className="to-go__field">
+                    <span>Place name</span>
+                    <input
+                        type="text"
+                        value={stop.label}
+                        onChange={(event) =>
+                            handleLabelChange(index, event.target.value)
+                        }
+                        placeholder="Enter stop name"
+                        disabled={detailInputsDisabled}
+                        ref={(element) => {
+                            labelInputRefs.current[index] = element;
+                        }}
+                        onFocus={() => {
+                            activeFieldRef.current = {
+                                index,
+                                field: "label",
+                            };
+                        }}
+                    />
+                </label>
+
+                {isExpanded && (predictionMap[index]?.length ?? 0) ? (
+                    <ul className="to-go__suggestions" role="listbox">
+                        {predictionMap[index]!.map((prediction) => (
+                            <li key={prediction.place_id}>
+                                <button
+                                    type="button"
+                                    className="to-go__suggestion"
+                                    onClick={() =>
+                                        handlePredictionSelect(
+                                            index,
+                                            prediction
+                                        )
+                                    }
+                                    disabled={detailInputsDisabled}
+                                >
+                                    <span className="to-go__suggestion-primary">
+                                        {
+                                            prediction.structured_formatting
+                                                .main_text
+                                        }
+                                    </span>
+                                    {prediction.structured_formatting
+                                        .secondary_text ? (
+                                        <span className="to-go__suggestion-secondary">
+                                            {
+                                                prediction.structured_formatting
+                                                    .secondary_text
+                                            }
+                                        </span>
+                                    ) : null}
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                ) : null}
+
+                <label className="to-go__field">
+                    <span>Notes</span>
+                    <textarea
+                        value={stop.notes ?? ""}
+                        onChange={(event) =>
+                            handleNotesChange(index, event.target.value)
+                        }
+                        placeholder="Add optional notes"
+                        rows={2}
+                        disabled={detailInputsDisabled}
+                    />
+                </label>
+
+                <label className="to-go__field">
+                    <span>Place ID (optional)</span>
+                    <input
+                        type="text"
+                        value={stop.placeId ?? ""}
+                        onChange={(event) =>
+                            handlePlaceIdChange(index, event.target.value)
+                        }
+                        placeholder="ChIJ..."
+                        disabled={detailInputsDisabled}
+                    />
+                </label>
+
+                <div className="to-go__field-grid">
+                    <label className="to-go__field to-go__field--compact">
+                        <span>Days</span>
+                        <input
+                            type="number"
+                            min="0"
+                            value={stop.timeToSpendDays ?? ""}
+                            onChange={(event) =>
+                                handleTimePieceChange(
+                                    index,
+                                    "timeToSpendDays",
+                                    event.target.value
+                                )
+                            }
+                            placeholder="0"
+                            disabled={detailInputsDisabled}
+                        />
+                    </label>
+                    <label className="to-go__field to-go__field--compact">
+                        <span>Hours</span>
+                        <input
+                            type="number"
+                            min="0"
+                            max="23"
+                            value={stop.timeToSpendHours ?? ""}
+                            onChange={(event) =>
+                                handleTimePieceChange(
+                                    index,
+                                    "timeToSpendHours",
+                                    event.target.value
+                                )
+                            }
+                            placeholder="0"
+                            disabled={detailInputsDisabled}
+                        />
+                    </label>
+                    <label className="to-go__field to-go__field--compact">
+                        <span>Minutes</span>
+                        <input
+                            type="number"
+                            min="0"
+                            max="59"
+                            value={stop.timeToSpendMinutes ?? ""}
+                            onChange={(event) =>
+                                handleTimePieceChange(
+                                    index,
+                                    "timeToSpendMinutes",
+                                    event.target.value
+                                )
+                            }
+                            placeholder="0"
+                            disabled={detailInputsDisabled}
+                        />
+                    </label>
+                    <button
+                        type="button"
+                        className="to-go__action to-go__action--ghost"
+                        onClick={() => handleTimeClear(index)}
+                        disabled={detailInputsDisabled}
+                    >
+                        Clear time
+                    </button>
+                </div>
+
+                <div className="to-go__field-grid to-go__field-grid--address">
+                    <label className="to-go__field">
+                        <span>Address</span>
+                        <input
+                            type="text"
+                            value={stop.description ?? ""}
+                            readOnly={true}
+                            placeholder="123 Example St, Vancouver, BC"
+                            disabled={detailInputsDisabled}
+                            className="to-go__field--readonly"
+                        />
+                    </label>
+                </div>
+            </div>
+        </li>
+    );
+}
 
 type ToGoListProps = {
     plan: TravelPlan | null;
@@ -68,6 +427,7 @@ function ToGoList({
 }: ToGoListProps) {
     const formStops = draftStops ?? plan?.stops ?? [];
     const isEditable = Boolean(onUpdateStop);
+    // const isEditable = true;
     const [expandedStops, setExpandedStops] = useState<Record<number, boolean>>(
         {}
     );
@@ -93,6 +453,14 @@ function ToGoList({
     const requestIdRef = useRef(0);
     const loaderRef = useRef<Loader | null>(null);
     const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+    const pointerSensor = useSensor(PointerSensor, {
+        // Reduce the distance required to initiate a drag
+        activationConstraint: { distance: 1 },
+    });
+    const keyboardSensor = useSensor(KeyboardSensor, {
+        coordinateGetter: sortableKeyboardCoordinates,
+    });
+    const sensors = useSensors(pointerSensor, keyboardSensor);
 
     const remapIndexAfterRemoval = (
         currentIndex: number,
@@ -196,6 +564,42 @@ function ToGoList({
         [formStops]
     );
 
+    // Always enable drag per user request
+    const enableDrag = true;
+
+    // Display order: list of indices referencing formStops
+    const [displayOrder, setDisplayOrder] = useState<number[]>([]);
+
+    // Initialize or sync display order when stops change in size/content
+    useEffect(() => {
+        const n = formStops.length;
+        // if length changed or displayOrder doesn't match, reset to identity
+        if (displayOrder.length !== n) {
+            setDisplayOrder(Array.from({ length: n }, (_, i) => i));
+            return;
+        }
+        // If items changed identity (e.g., new plan), also reset
+        // We check by comparing labels/placeIds shallowly
+        const identityChanged = displayOrder.some((di, pos) => {
+            const stop = formStops[di];
+            const expected = formStops[pos];
+            return (
+                (stop?.placeId ?? stop?.label ?? di) !==
+                (expected?.placeId ?? expected?.label ?? pos)
+            );
+        });
+        if (identityChanged) {
+            setDisplayOrder(Array.from({ length: n }, (_, i) => i));
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [formStops]);
+
+    // Sortable ids are generated from display indices to keep them stable
+    const sortableIds = useMemo(
+        () => displayOrder.map((di) => `stop-${di}`),
+        [displayOrder]
+    );
+
     const predictionMap = useMemo(
         () => predictionStoreRef.current,
         [predictionTick]
@@ -204,6 +608,25 @@ function ToGoList({
     const canSave = Boolean(isEditable && onSave && hasPendingChanges);
     const showUnsavedBadge = Boolean(isEditable && hasPendingChanges);
     const inputsDisabled = !isEditable;
+
+    // Debug information
+    useEffect(() => {
+        console.log("ToGoList Debug Info:", {
+            enableDrag,
+            hasOnMoveStop: !!onMoveStop,
+            formStops: formStops.length,
+            isEditable,
+            plan: !!plan,
+            draftStops: !!draftStops,
+        });
+    }, [
+        enableDrag,
+        onMoveStop,
+        formStops.length,
+        isEditable,
+        plan,
+        draftStops,
+    ]);
 
     const toggleStopDetails = (index: number) => {
         setExpandedStops((prev) => {
@@ -240,10 +663,6 @@ function ToGoList({
         });
     };
 
-    const handleDescriptionChange = (index: number, value: string) => {
-        onUpdateStop?.(index, { description: value.length ? value : "" });
-    };
-
     const handleNotesChange = (index: number, value: string) => {
         onUpdateStop?.(index, { notes: value.length ? value : "" });
     };
@@ -251,25 +670,6 @@ function ToGoList({
     const handlePlaceIdChange = (index: number, value: string) => {
         const trimmed = value.trim();
         onUpdateStop?.(index, { placeId: trimmed || undefined });
-    };
-
-    const handleCoordinateChange = (
-        index: number,
-        key: "latitude" | "longitude",
-        value: string
-    ) => {
-        const trimmed = value.trim();
-        if (!trimmed) {
-            onUpdateStop?.(index, { [key]: undefined } as Partial<PlanStop>);
-            return;
-        }
-
-        const numeric = Number(trimmed);
-        if (Number.isNaN(numeric)) {
-            return;
-        }
-
-        onUpdateStop?.(index, { [key]: numeric } as Partial<PlanStop>);
     };
 
     const handleTimePieceChange = (
@@ -365,6 +765,105 @@ function ToGoList({
 
     const handleSelectStopClick = (stop: PlanStop, index: number) => {
         onSelectStop?.(stop, index);
+    };
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        // Add debug logging
+        console.log("Drag end event fired", {
+            hasOnMoveStop: !!onMoveStop,
+            active: event.active.id,
+            over: event.over?.id,
+            sortableIds,
+        });
+
+        const { active, over } = event;
+        if (!over) {
+            return;
+        }
+
+        const fromRank = sortableIds.indexOf(String(active.id));
+        const toRank = sortableIds.indexOf(String(over.id));
+
+        if (fromRank === -1 || toRank === -1 || fromRank === toRank) {
+            return;
+        }
+
+        // Update focus tracking
+        if (
+            activeFieldRef.current &&
+            activeFieldRef.current.index === fromRank
+        ) {
+            activeFieldRef.current = {
+                index: toRank,
+                field: activeFieldRef.current.field,
+            };
+            pendingFocusIndexRef.current = toRank;
+        }
+
+        // Also update expanded stops state
+        setExpandedStops((prevExpanded) => {
+            const newExpanded = { ...prevExpanded };
+
+            // If dragged item was expanded, it should remain expanded at new position
+            if (prevExpanded[fromRank]) {
+                delete newExpanded[fromRank];
+                newExpanded[toRank] = true;
+            }
+
+            // Shift other expanded items as needed
+            Object.keys(prevExpanded).forEach((key) => {
+                const idx = parseInt(key);
+                if (idx === fromRank) return; // Already handled
+
+                // Shift indices for items between source and destination
+                if (fromRank < toRank) {
+                    // Moving down
+                    if (idx > fromRank && idx <= toRank) {
+                        // Shift up by 1
+                        delete newExpanded[idx];
+                        newExpanded[idx - 1] = true;
+                    }
+                } else {
+                    // Moving up
+                    if (idx < fromRank && idx >= toRank) {
+                        // Shift down by 1
+                        delete newExpanded[idx];
+                        newExpanded[idx + 1] = true;
+                    }
+                }
+            });
+
+            return newExpanded;
+        });
+
+        // Update local display order immediately for visual result
+        setDisplayOrder((prev) => {
+            const next = [...prev];
+            const [moved] = next.splice(fromRank, 1);
+            next.splice(toRank, 0, moved);
+            console.log("Updated display order", { prev, next });
+            return next;
+        });
+
+        // If parent provided handler, call it
+        if (onMoveStop) {
+            console.log("Calling onMoveStop", { fromRank, toRank });
+            // Make sure indices are within valid range before calling handler
+            if (
+                fromRank >= 0 &&
+                fromRank < formStops.length &&
+                toRank >= 0 &&
+                toRank < formStops.length
+            ) {
+                onMoveStop(fromRank, toRank);
+            } else {
+                console.error("Invalid indices for onMoveStop", {
+                    fromRank,
+                    toRank,
+                    formStopsLength: formStops.length,
+                });
+            }
+        }
     };
 
     useEffect(() => {
@@ -553,340 +1052,475 @@ function ToGoList({
                 </button>
             </header>
 
-            <ol className="to-go__list" ref={listRef}>
-                {isLoading ? (
-                    <li className="to-go__empty">Loading your stops…</li>
-                ) : formStops.length ? (
-                    formStops.map((stop, index) => {
-                        const isSelected = selectedStopIndex === index;
-                        const isExpanded = expandedStops[index] ?? false;
-                        const summary = durationSummaries[index];
-                        const isNew = typeof stop.__originalIndex !== "number";
-                        const displayTitle =
-                            (stop.displayName ?? stop.label ?? "").trim() ||
-                            "Untitled stop";
-                        const detailInputsDisabled = inputsDisabled;
+            {/* Debug info - adding debug logging here */}
+            {enableDrag ? (
+                <DndContext
+                    sensors={sensors}
+                    modifiers={[restrictToVerticalAxis]}
+                    onDragEnd={handleDragEnd}
+                    // Add additional props to improve dragging experience
+                    autoScroll={true}
+                >
+                    <SortableContext
+                        items={sortableIds}
+                        strategy={verticalListSortingStrategy}
+                    >
+                        <ol className="to-go__list" ref={listRef}>
+                            {isLoading ? (
+                                <li className="to-go__empty">
+                                    Loading your stops…
+                                </li>
+                            ) : formStops.length ? (
+                                displayOrder.map((displayIndex, rank) => {
+                                    const stop = formStops[displayIndex];
+                                    const isSelected =
+                                        selectedStopIndex === displayIndex;
+                                    const isExpanded =
+                                        expandedStops[displayIndex] ?? false;
+                                    const summary =
+                                        durationSummaries[displayIndex];
+                                    const isNew =
+                                        typeof stop.__originalIndex !==
+                                        "number";
+                                    const displayTitle =
+                                        (
+                                            stop.displayName ??
+                                            stop.label ??
+                                            ""
+                                        ).trim() || "Untitled stop";
+                                    const detailInputsDisabled = inputsDisabled;
 
-                        return (
-                            <li
-                                key={`${plan?.id ?? "plan"}-${
-                                    stop.__originalIndex ??
-                                    stop.placeId ??
-                                    `${index}-${stop.label}`
-                                }`}
-                                className={[
-                                    "to-go__item",
-                                    isSelected ? "to-go__item--selected" : "",
-                                    isExpanded ? "to-go__item--open" : "",
-                                    isNew ? "to-go__item--draft-new" : "",
-                                ]
-                                    .filter(Boolean)
-                                    .join(" ")}
-                                ref={(element) => {
-                                    itemRefs.current[index] = element;
-                                }}
-                            >
-                                <div className="to-go__item-header">
+                                    return (
+                                        <SortableStopItem
+                                            key={`${plan?.id ?? "plan"}-${
+                                                stop.__originalIndex ??
+                                                stop.placeId ??
+                                                `${displayIndex}-${stop.label}`
+                                            }`}
+                                            id={sortableIds[rank]}
+                                            index={displayIndex}
+                                            rank={rank}
+                                            stop={stop}
+                                            isSelected={isSelected}
+                                            isExpanded={isExpanded}
+                                            summary={summary}
+                                            isNew={isNew}
+                                            displayTitle={displayTitle}
+                                            detailInputsDisabled={
+                                                detailInputsDisabled
+                                            }
+                                            handleSelectStopClick={
+                                                handleSelectStopClick
+                                            }
+                                            toggleStopDetails={
+                                                toggleStopDetails
+                                            }
+                                            handleRemoveStopClick={
+                                                handleRemoveStopClick
+                                            }
+                                            handleDisplayNameChange={
+                                                handleDisplayNameChange
+                                            }
+                                            handleLabelChange={
+                                                handleLabelChange
+                                            }
+                                            predictionMap={predictionMap}
+                                            handlePredictionSelect={
+                                                handlePredictionSelect
+                                            }
+                                            handleNotesChange={
+                                                handleNotesChange
+                                            }
+                                            handlePlaceIdChange={
+                                                handlePlaceIdChange
+                                            }
+                                            handleTimePieceChange={
+                                                handleTimePieceChange
+                                            }
+                                            handleTimeClear={handleTimeClear}
+                                            displayNameInputRefs={
+                                                displayNameInputRefs
+                                            }
+                                            labelInputRefs={labelInputRefs}
+                                            itemRefs={itemRefs}
+                                            activeFieldRef={activeFieldRef}
+                                        />
+                                    );
+                                })
+                            ) : (
+                                <li className="to-go__empty">
+                                    <p>
+                                        No stops yet. Start building your
+                                        itinerary.
+                                    </p>
                                     <button
                                         type="button"
-                                        className="to-go__item-select"
-                                        onClick={() =>
-                                            handleSelectStopClick(stop, index)
-                                        }
-                                        aria-pressed={isSelected}
+                                        className="to-go__button to-go__button--secondary"
+                                        onClick={handleAddStopClick}
+                                        disabled={!isEditable}
                                     >
-                                        <span className="to-go__step">
-                                            {index + 1}
-                                        </span>
-                                        <div className="to-go__item-text">
-                                            <span className="to-go__title">
-                                                {displayTitle}
-                                            </span>
-                                            {summary ? (
-                                                <span className="to-go__time-pill">
-                                                    {summary}
-                                                </span>
-                                            ) : null}
-                                            {isNew ? (
-                                                <span className="to-go__chip to-go__chip--new">
-                                                    New
-                                                </span>
-                                            ) : null}
-                                        </div>
+                                        Add the first stop
                                     </button>
-                                    <div className="to-go__item-actions">
-                                        <button
-                                            type="button"
-                                            className="to-go__action to-go__action--toggle"
-                                            onClick={() =>
-                                                toggleStopDetails(index)
-                                            }
-                                            aria-expanded={isExpanded}
-                                        >
-                                            {isExpanded ? "Hide" : "Details"}
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="to-go__action to-go__action--danger"
-                                            onClick={() =>
-                                                handleRemoveStopClick(index)
-                                            }
-                                            disabled={
-                                                !isEditable || !onRemoveStop
-                                            }
-                                        >
-                                            -
-                                        </button>
-                                    </div>
-                                </div>
+                                </li>
+                            )}
+                        </ol>
+                    </SortableContext>
+                </DndContext>
+            ) : (
+                <ol className="to-go__list" ref={listRef}>
+                    {isLoading ? (
+                        <li className="to-go__empty">Loading your stops…</li>
+                    ) : formStops.length ? (
+                        formStops.map((stop, index) => {
+                            const isSelected = selectedStopIndex === index;
+                            const isExpanded = expandedStops[index] ?? false;
+                            const summary = durationSummaries[index];
+                            const isNew =
+                                typeof stop.__originalIndex !== "number";
+                            const displayTitle =
+                                (stop.displayName ?? stop.label ?? "").trim() ||
+                                "Untitled stop";
+                            const detailInputsDisabled = inputsDisabled;
 
-                                <div
-                                    className={
-                                        isExpanded
-                                            ? "to-go__item-details to-go__item-details--open"
-                                            : "to-go__item-details"
-                                    }
+                            return (
+                                <li
+                                    key={`${plan?.id ?? "plan"}-${
+                                        stop.__originalIndex ??
+                                        stop.placeId ??
+                                        `${index}-${stop.label}`
+                                    }`}
+                                    ref={(element) => {
+                                        itemRefs.current[index] = element;
+                                    }}
+                                    className={[
+                                        "to-go__item",
+                                        isSelected
+                                            ? "to-go__item--selected"
+                                            : "",
+                                        isExpanded ? "to-go__item--open" : "",
+                                        isNew ? "to-go__item--draft-new" : "",
+                                    ]
+                                        .filter(Boolean)
+                                        .join(" ")}
                                 >
-                                    <label className="to-go__field">
-                                        <span>Display name</span>
-                                        <input
-                                            type="text"
-                                            value={stop.displayName ?? ""}
-                                            onChange={(event) =>
-                                                handleDisplayNameChange(
-                                                    index,
-                                                    event.target.value
-                                                )
-                                            }
-                                            placeholder="How should we refer to this stop?"
-                                            disabled={detailInputsDisabled}
-                                            ref={(element) => {
-                                                displayNameInputRefs.current[
+                                    <div className="to-go__item-header">
+                                        <button
+                                            type="button"
+                                            className="to-go__item-select"
+                                            onClick={() =>
+                                                handleSelectStopClick(
+                                                    stop,
                                                     index
-                                                ] = element;
-                                            }}
-                                            onFocus={() => {
-                                                activeFieldRef.current = {
-                                                    index,
-                                                    field: "display",
-                                                };
-                                            }}
-                                        />
-                                    </label>
-                                    <label className="to-go__field">
-                                        <span>Place name</span>
-                                        <input
-                                            type="text"
-                                            value={stop.label}
-                                            onChange={(event) =>
-                                                handleLabelChange(
-                                                    index,
-                                                    event.target.value
                                                 )
                                             }
-                                            placeholder="Enter stop name"
-                                            disabled={detailInputsDisabled}
-                                            ref={(element) => {
-                                                labelInputRefs.current[index] =
-                                                    element;
-                                            }}
-                                            onFocus={() => {
-                                                activeFieldRef.current = {
-                                                    index,
-                                                    field: "label",
-                                                };
-                                            }}
-                                        />
-                                    </label>
-
-                                    {isExpanded &&
-                                    (predictionMap[index]?.length ?? 0) ? (
-                                        <ul
-                                            className="to-go__suggestions"
-                                            role="listbox"
+                                            aria-pressed={isSelected}
                                         >
-                                            {predictionMap[index]!.map(
-                                                (prediction) => (
-                                                    <li
-                                                        key={
-                                                            prediction.place_id
-                                                        }
-                                                    >
-                                                        <button
-                                                            type="button"
-                                                            className="to-go__suggestion"
-                                                            onClick={() =>
-                                                                handlePredictionSelect(
-                                                                    index,
-                                                                    prediction
-                                                                )
-                                                            }
-                                                            disabled={
-                                                                detailInputsDisabled
+                                            <span className="to-go__step">
+                                                {index + 1}
+                                            </span>
+                                            <div className="to-go__item-text">
+                                                <span className="to-go__title">
+                                                    {displayTitle}
+                                                </span>
+                                                {summary ? (
+                                                    <span className="to-go__time-pill">
+                                                        {summary}
+                                                    </span>
+                                                ) : null}
+                                                {isNew ? (
+                                                    <span className="to-go__chip to-go__chip--new">
+                                                        New
+                                                    </span>
+                                                ) : null}
+                                            </div>
+                                        </button>
+                                        <div className="to-go__item-actions">
+                                            <button
+                                                type="button"
+                                                className="to-go__action to-go__action--toggle"
+                                                onClick={() =>
+                                                    toggleStopDetails(index)
+                                                }
+                                                aria-expanded={isExpanded}
+                                            >
+                                                {isExpanded
+                                                    ? "Hide"
+                                                    : "Details"}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="to-go__action to-go__action--danger"
+                                                onClick={() =>
+                                                    handleRemoveStopClick(index)
+                                                }
+                                                disabled={inputsDisabled}
+                                            >
+                                                -
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        className={
+                                            isExpanded
+                                                ? "to-go__item-details to-go__item-details--open"
+                                                : "to-go__item-details"
+                                        }
+                                    >
+                                        {/* Details content same as in SortableStopItem */}
+                                        <label className="to-go__field">
+                                            <span>Display name</span>
+                                            <input
+                                                type="text"
+                                                value={stop.displayName ?? ""}
+                                                onChange={(event) =>
+                                                    handleDisplayNameChange(
+                                                        index,
+                                                        event.target.value
+                                                    )
+                                                }
+                                                placeholder="How should we refer to this stop?"
+                                                disabled={detailInputsDisabled}
+                                                ref={(element) => {
+                                                    displayNameInputRefs.current[
+                                                        index
+                                                    ] = element;
+                                                }}
+                                                onFocus={() => {
+                                                    activeFieldRef.current = {
+                                                        index,
+                                                        field: "display",
+                                                    };
+                                                }}
+                                            />
+                                        </label>
+                                        <label className="to-go__field">
+                                            <span>Place name</span>
+                                            <input
+                                                type="text"
+                                                value={stop.label}
+                                                onChange={(event) =>
+                                                    handleLabelChange(
+                                                        index,
+                                                        event.target.value
+                                                    )
+                                                }
+                                                placeholder="Enter stop name"
+                                                disabled={detailInputsDisabled}
+                                                ref={(element) => {
+                                                    labelInputRefs.current[
+                                                        index
+                                                    ] = element;
+                                                }}
+                                                onFocus={() => {
+                                                    activeFieldRef.current = {
+                                                        index,
+                                                        field: "label",
+                                                    };
+                                                }}
+                                            />
+                                        </label>
+
+                                        {isExpanded &&
+                                        (predictionMap[index]?.length ?? 0) ? (
+                                            <ul
+                                                className="to-go__suggestions"
+                                                role="listbox"
+                                            >
+                                                {predictionMap[index]!.map(
+                                                    (prediction) => (
+                                                        <li
+                                                            key={
+                                                                prediction.place_id
                                                             }
                                                         >
-                                                            <span className="to-go__suggestion-primary">
-                                                                {
-                                                                    prediction
-                                                                        .structured_formatting
-                                                                        .main_text
+                                                            <button
+                                                                type="button"
+                                                                className="to-go__suggestion"
+                                                                onClick={() =>
+                                                                    handlePredictionSelect(
+                                                                        index,
+                                                                        prediction
+                                                                    )
                                                                 }
-                                                            </span>
-                                                            {prediction
-                                                                .structured_formatting
-                                                                .secondary_text ? (
-                                                                <span className="to-go__suggestion-secondary">
+                                                                disabled={
+                                                                    detailInputsDisabled
+                                                                }
+                                                            >
+                                                                <span className="to-go__suggestion-primary">
                                                                     {
                                                                         prediction
                                                                             .structured_formatting
-                                                                            .secondary_text
+                                                                            .main_text
                                                                     }
                                                                 </span>
-                                                            ) : null}
-                                                        </button>
-                                                    </li>
-                                                )
-                                            )}
-                                        </ul>
-                                    ) : null}
-
-                                    <label className="to-go__field">
-                                        <span>Notes</span>
-                                        <textarea
-                                            value={stop.notes ?? ""}
-                                            onChange={(event) =>
-                                                handleNotesChange(
-                                                    index,
-                                                    event.target.value
-                                                )
-                                            }
-                                            placeholder="Add optional notes"
-                                            rows={2}
-                                            disabled={detailInputsDisabled}
-                                        />
-                                    </label>
-
-                                    <label className="to-go__field">
-                                        <span>Place ID (optional)</span>
-                                        <input
-                                            type="text"
-                                            value={stop.placeId ?? ""}
-                                            onChange={(event) =>
-                                                handlePlaceIdChange(
-                                                    index,
-                                                    event.target.value
-                                                )
-                                            }
-                                            placeholder="ChIJ..."
-                                            disabled={detailInputsDisabled}
-                                        />
-                                    </label>
-
-                                    <div className="to-go__field-grid">
-                                        <label className="to-go__field to-go__field--compact">
-                                            <span>Days</span>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                value={
-                                                    stop.timeToSpendDays ?? ""
-                                                }
-                                                onChange={(event) =>
-                                                    handleTimePieceChange(
-                                                        index,
-                                                        "timeToSpendDays",
-                                                        event.target.value
+                                                                {prediction
+                                                                    .structured_formatting
+                                                                    .secondary_text ? (
+                                                                    <span className="to-go__suggestion-secondary">
+                                                                        {
+                                                                            prediction
+                                                                                .structured_formatting
+                                                                                .secondary_text
+                                                                        }
+                                                                    </span>
+                                                                ) : null}
+                                                            </button>
+                                                        </li>
                                                     )
-                                                }
-                                                placeholder="0"
-                                                disabled={detailInputsDisabled}
-                                            />
-                                        </label>
-                                        <label className="to-go__field to-go__field--compact">
-                                            <span>Hours</span>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                max="23"
-                                                value={
-                                                    stop.timeToSpendHours ?? ""
-                                                }
-                                                onChange={(event) =>
-                                                    handleTimePieceChange(
-                                                        index,
-                                                        "timeToSpendHours",
-                                                        event.target.value
-                                                    )
-                                                }
-                                                placeholder="0"
-                                                disabled={detailInputsDisabled}
-                                            />
-                                        </label>
-                                        <label className="to-go__field to-go__field--compact">
-                                            <span>Minutes</span>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                max="59"
-                                                value={
-                                                    stop.timeToSpendMinutes ??
-                                                    ""
-                                                }
-                                                onChange={(event) =>
-                                                    handleTimePieceChange(
-                                                        index,
-                                                        "timeToSpendMinutes",
-                                                        event.target.value
-                                                    )
-                                                }
-                                                placeholder="0"
-                                                disabled={detailInputsDisabled}
-                                            />
-                                        </label>
-                                        <button
-                                            type="button"
-                                            className="to-go__action to-go__action--ghost"
-                                            onClick={() =>
-                                                handleTimeClear(index)
-                                            }
-                                            disabled={detailInputsDisabled}
-                                        >
-                                            Clear time
-                                        </button>
-                                    </div>
+                                                )}
+                                            </ul>
+                                        ) : null}
 
-                                    <div className="to-go__field-grid to-go__field-grid--address">
                                         <label className="to-go__field">
-                                            <span>Address</span>
+                                            <span>Notes</span>
+                                            <textarea
+                                                value={stop.notes ?? ""}
+                                                onChange={(event) =>
+                                                    handleNotesChange(
+                                                        index,
+                                                        event.target.value
+                                                    )
+                                                }
+                                                placeholder="Add optional notes"
+                                                rows={2}
+                                                disabled={detailInputsDisabled}
+                                            />
+                                        </label>
+
+                                        <label className="to-go__field">
+                                            <span>Place ID (optional)</span>
                                             <input
                                                 type="text"
-                                                value={stop.description ?? ""}
-                                                readOnly={true}
-                                                placeholder="123 Example St, Vancouver, BC"
+                                                value={stop.placeId ?? ""}
+                                                onChange={(event) =>
+                                                    handlePlaceIdChange(
+                                                        index,
+                                                        event.target.value
+                                                    )
+                                                }
+                                                placeholder="ChIJ..."
                                                 disabled={detailInputsDisabled}
-                                                className="to-go__field--readonly"
                                             />
                                         </label>
+
+                                        <div className="to-go__field-grid">
+                                            <label className="to-go__field to-go__field--compact">
+                                                <span>Days</span>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    value={
+                                                        stop.timeToSpendDays ??
+                                                        ""
+                                                    }
+                                                    onChange={(event) =>
+                                                        handleTimePieceChange(
+                                                            index,
+                                                            "timeToSpendDays",
+                                                            event.target.value
+                                                        )
+                                                    }
+                                                    placeholder="0"
+                                                    disabled={
+                                                        detailInputsDisabled
+                                                    }
+                                                />
+                                            </label>
+                                            <label className="to-go__field to-go__field--compact">
+                                                <span>Hours</span>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    max="23"
+                                                    value={
+                                                        stop.timeToSpendHours ??
+                                                        ""
+                                                    }
+                                                    onChange={(event) =>
+                                                        handleTimePieceChange(
+                                                            index,
+                                                            "timeToSpendHours",
+                                                            event.target.value
+                                                        )
+                                                    }
+                                                    placeholder="0"
+                                                    disabled={
+                                                        detailInputsDisabled
+                                                    }
+                                                />
+                                            </label>
+                                            <label className="to-go__field to-go__field--compact">
+                                                <span>Minutes</span>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    max="59"
+                                                    value={
+                                                        stop.timeToSpendMinutes ??
+                                                        ""
+                                                    }
+                                                    onChange={(event) =>
+                                                        handleTimePieceChange(
+                                                            index,
+                                                            "timeToSpendMinutes",
+                                                            event.target.value
+                                                        )
+                                                    }
+                                                    placeholder="0"
+                                                    disabled={
+                                                        detailInputsDisabled
+                                                    }
+                                                />
+                                            </label>
+                                            <button
+                                                type="button"
+                                                className="to-go__action to-go__action--ghost"
+                                                onClick={() =>
+                                                    handleTimeClear(index)
+                                                }
+                                                disabled={detailInputsDisabled}
+                                            >
+                                                Clear time
+                                            </button>
+                                        </div>
+
+                                        <div className="to-go__field-grid to-go__field-grid--address">
+                                            <label className="to-go__field">
+                                                <span>Address</span>
+                                                <input
+                                                    type="text"
+                                                    value={
+                                                        stop.description ?? ""
+                                                    }
+                                                    readOnly={true}
+                                                    placeholder="123 Example St, Vancouver, BC"
+                                                    disabled={
+                                                        detailInputsDisabled
+                                                    }
+                                                    className="to-go__field--readonly"
+                                                />
+                                            </label>
+                                        </div>
                                     </div>
-                                    {/* coordinates intentionally hidden from main UI */}
-                                </div>
-                            </li>
-                        );
-                    })
-                ) : (
-                    <li className="to-go__empty">
-                        <p>No stops yet. Start building your itinerary.</p>
-                        <button
-                            type="button"
-                            className="to-go__button to-go__button--secondary"
-                            onClick={handleAddStopClick}
-                            disabled={!isEditable}
-                        >
-                            Add the first stop
-                        </button>
-                    </li>
-                )}
-            </ol>
+                                </li>
+                            );
+                        })
+                    ) : (
+                        <li className="to-go__empty">
+                            <p>No stops yet. Start building your itinerary.</p>
+                            <button
+                                type="button"
+                                className="to-go__button to-go__button--secondary"
+                                onClick={handleAddStopClick}
+                                disabled={!isEditable}
+                            >
+                                Add the first stop
+                            </button>
+                        </li>
+                    )}
+                </ol>
+            )}
         </section>
     );
 }

@@ -1196,6 +1196,7 @@ function App() {
     };
 
     const handleDraftMoveStop = (fromIndex: number, toIndex: number) => {
+        console.log("handleDraftMoveStop called", { fromIndex, toIndex });
         let planIdForUpdate: string | null = null;
         let normalizedFrom = fromIndex;
         let normalizedTo = toIndex;
