@@ -40,6 +40,9 @@ def init_db() -> None:
                 position INTEGER NOT NULL,
                 latitude REAL,
                 longitude REAL,
+                time_days INTEGER,
+                time_hours INTEGER,
+                time_minutes INTEGER,
                 FOREIGN KEY(plan_id) REFERENCES plans(id) ON DELETE CASCADE
             )
             """
@@ -47,6 +50,9 @@ def init_db() -> None:
         _ensure_column(conn, "plan_stops", "latitude", "REAL")
         _ensure_column(conn, "plan_stops", "longitude", "REAL")
         _ensure_column(conn, "plan_stops", "display_label", "TEXT")
+        _ensure_column(conn, "plan_stops", "time_days", "INTEGER")
+        _ensure_column(conn, "plan_stops", "time_hours", "INTEGER")
+        _ensure_column(conn, "plan_stops", "time_minutes", "INTEGER")
         _ensure_column(conn, "plans", "owner_id", "TEXT")
         conn.execute(
             """
@@ -139,8 +145,8 @@ def save_plan(plan: TravelPlan, owner_id: Optional[str]) -> None:
         for position, stop in enumerate(plan.stops):
             conn.execute(
                 """
-                INSERT INTO plan_stops (plan_id, label, display_label, description, place_id, position, latitude, longitude)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO plan_stops (plan_id, label, display_label, description, place_id, position, latitude, longitude, time_days, time_hours, time_minutes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     plan.id,
@@ -151,6 +157,9 @@ def save_plan(plan: TravelPlan, owner_id: Optional[str]) -> None:
                     position,
                     stop.latitude,
                     stop.longitude,
+                    stop.time_to_spend_days,
+                    stop.time_to_spend_hours,
+                    stop.time_to_spend_minutes,
                 ),
             )
         conn.commit()
@@ -209,7 +218,7 @@ def delete_plan(plan_id: str, owner_id: str) -> bool:
 def _fetch_stops(conn: sqlite3.Connection, plan_id: str) -> List[PlanStop]:
     stop_rows = conn.execute(
         """
-        SELECT label, display_label, description, place_id, latitude, longitude
+        SELECT label, display_label, description, place_id, latitude, longitude, time_days, time_hours, time_minutes
         FROM plan_stops
         WHERE plan_id = ?
         ORDER BY position ASC
@@ -224,8 +233,11 @@ def _fetch_stops(conn: sqlite3.Connection, plan_id: str) -> List[PlanStop]:
             place_id=place_id,
             latitude=latitude,
             longitude=longitude,
+            time_to_spend_days=time_days,
+            time_to_spend_hours=time_hours,
+            time_to_spend_minutes=time_minutes,
         )
-        for label, display_label, description, place_id, latitude, longitude in stop_rows
+        for label, display_label, description, place_id, latitude, longitude, time_days, time_hours, time_minutes in stop_rows
     ]
 
 

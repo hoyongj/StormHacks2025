@@ -102,7 +102,9 @@ function ToGoList({
         if (formStops.length > previousCountRef.current) {
             const newIndex = formStops.length - 1;
             pendingFocusIndexRef.current = newIndex;
-            setExpandedStops((prev) => ({ ...prev, [newIndex]: true }));
+            // When a new stop is added, collapse any other expanded stops
+            // and only expand the newly-added stop.
+            setExpandedStops(() => ({ [newIndex]: true }));
         }
         previousCountRef.current = formStops.length;
     }, [formStops.length, formStops]);
@@ -112,15 +114,34 @@ function ToGoList({
         if (index === null) {
             return;
         }
-        const input = displayNameInputRefs.current[index];
-        if (input) {
-            input.focus();
-            input.select();
-            input.scrollIntoView({ behavior: "smooth", block: "center" });
-        } else {
-            const item = itemRefs.current[index];
-            item?.scrollIntoView({ behavior: "smooth", block: "center" });
+        const targetInput = displayNameInputRefs.current[index];
+        const targetItem = itemRefs.current[index];
+        const targetElement = targetInput ?? targetItem ?? null;
+
+        if (targetInput) {
+            targetInput.focus();
+            targetInput.select();
         }
+
+        const listElement = listRef.current;
+        if (targetElement && listElement) {
+            const elementOffset = targetElement.offsetTop;
+            const desiredTop = Math.max(
+                0,
+                elementOffset - listElement.clientHeight * 0.25
+            );
+            listElement.scrollTo({
+                top: desiredTop,
+                behavior: "smooth",
+            });
+        } else if (targetElement) {
+            targetElement.scrollIntoView({
+                behavior: "smooth",
+                block: "nearest",
+                inline: "nearest",
+            });
+        }
+
         pendingFocusIndexRef.current = null;
     }, [formStops, expandedStops]);
 
@@ -203,9 +224,11 @@ function ToGoList({
     };
 
     const handleDisplayNameChange = (index: number, value: string) => {
-        const trimmed = value.trim();
+        // Preserve spaces the user types (including internal and trailing spaces)
+        // so the input feels natural. Only collapse to undefined when the
+        // string is empty. Trimming for storage can be handled on save/blurs.
         onUpdateStop?.(index, {
-            displayName: trimmed.length ? trimmed : undefined,
+            displayName: value.length ? value : undefined,
         });
     };
 

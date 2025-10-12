@@ -23,6 +23,24 @@ class PlanStop(BaseModel):
     )
     latitude: Optional[float] = Field(default=None, description="Latitude in decimal degrees.")
     longitude: Optional[float] = Field(default=None, description="Longitude in decimal degrees.")
+    time_to_spend_days: Optional[int] = Field(
+        default=None,
+        ge=0,
+        alias="timeToSpendDays",
+        description="Optional number of days planned at this stop.",
+    )
+    time_to_spend_hours: Optional[int] = Field(
+        default=None,
+        ge=0,
+        alias="timeToSpendHours",
+        description="Optional number of hours planned at this stop.",
+    )
+    time_to_spend_minutes: Optional[int] = Field(
+        default=None,
+        ge=0,
+        alias="timeToSpendMinutes",
+        description="Optional number of minutes planned at this stop.",
+    )
 
     class Config:
         allow_population_by_field_name = True

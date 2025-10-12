@@ -66,6 +66,9 @@ type PlanStopResponse = {
     timeToSpendDays?: number | null;
     timeToSpendHours?: number | null;
     timeToSpendMinutes?: number | null;
+    time_days?: number | null;
+    time_hours?: number | null;
+    time_minutes?: number | null;
 };
 
 export type TripAdvisorSuggestion = {
@@ -1970,14 +1973,26 @@ function serializePlanForSave(plan: TravelPlan) {
 function serializeStopForSave(stop: PlanStop) {
     return {
         label: stop.label,
-        display_name:
+        displayName:
             typeof stop.displayName === "string" && stop.displayName.length
                 ? stop.displayName
-                : null,
+                : undefined,
         description: stop.description ?? "",
         place_id: stop.placeId ?? null,
         latitude: typeof stop.latitude === "number" ? stop.latitude : null,
         longitude: typeof stop.longitude === "number" ? stop.longitude : null,
+        timeToSpendDays:
+            typeof stop.timeToSpendDays === "number"
+                ? stop.timeToSpendDays
+                : null,
+        timeToSpendHours:
+            typeof stop.timeToSpendHours === "number"
+                ? stop.timeToSpendHours
+                : null,
+        timeToSpendMinutes:
+            typeof stop.timeToSpendMinutes === "number"
+                ? stop.timeToSpendMinutes
+                : null,
     };
 }
 
@@ -2018,14 +2033,20 @@ function normalizePlan(plan: TravelPlanResponse): TravelPlan {
             timeToSpendDays:
                 typeof stop.timeToSpendDays === "number"
                     ? stop.timeToSpendDays
+                    : typeof stop.time_days === "number"
+                    ? stop.time_days
                     : undefined,
             timeToSpendHours:
                 typeof stop.timeToSpendHours === "number"
                     ? stop.timeToSpendHours
+                    : typeof stop.time_hours === "number"
+                    ? stop.time_hours
                     : undefined,
             timeToSpendMinutes:
                 typeof stop.timeToSpendMinutes === "number"
                     ? stop.timeToSpendMinutes
+                    : typeof stop.time_minutes === "number"
+                    ? stop.time_minutes
                     : undefined,
             __originalIndex: index,
         })),
