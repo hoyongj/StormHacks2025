@@ -21,7 +21,7 @@ export type PlanStop = {
     label: string;
     displayName?: string;
     description?: string; // This will now be used for address only
-    notes?: string;       // New field for notes
+    notes?: string; // New field for notes
     placeId?: string;
     latitude?: number;
     longitude?: number;

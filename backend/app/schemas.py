@@ -17,7 +17,7 @@ class PlanStop(BaseModel):
         description="Optional display label chosen by the user",
     )
     description: Optional[str] = Field(
-        default=None, 
+        default=None,
         description="Address or location description"
     )
     notes: Optional[str] = Field(
