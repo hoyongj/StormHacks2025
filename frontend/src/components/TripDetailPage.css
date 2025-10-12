@@ -218,6 +218,14 @@
     color: #4d4d6d;
 }
 
+/* Compatibility with older class name */
+.trip-detail__stop-desc {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: #4d4d6d;
+}
+
 .trip-detail-stop-location {
     display: flex;
     gap: 0.5rem;
@@ -413,22 +421,43 @@
         padding: 0;
     }
 
-    .trip-detail-close,
-    .trip-detail-footer {
-        display: none;
+    .no-print {
+        display: none !important;
     }
 
-    .trip-detail-header {
+    .trip-detail-header:not(.no-print) {
         background: white;
         color: #16192c;
         page-break-after: avoid;
     }
 
+    .trip-detail {
+        max-height: none !important;
+        overflow: visible !important;
+    }
+
     .trip-detail-stop {
         break-inside: avoid;
+        page-break-inside: avoid;
     }
 
     .trip-detail-transit {
         break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    /* Ensure clean text print */
+    body {
+        color: black !important;
+        background: white !important;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    p,
+    span {
+        color: black !important;
     }
 }

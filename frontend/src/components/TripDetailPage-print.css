@@ -1,0 +1,65 @@
+@media print {
+    /* Hide everything except the trip detail content */
+    body * {
+        visibility: hidden;
+    }
+
+    /* Show only trip detail content */
+    .trip-detail-content {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        visibility: visible;
+    }
+
+    .trip-detail-content * {
+        visibility: visible;
+    }
+
+    /* Hide UI elements not needed for print */
+    .trip-detail-overlay,
+    .trip-detail-close,
+    .trip-detail-footer,
+    body > *:not(.trip-detail-page),
+    .app__sidebar,
+    .app__tabs,
+    .app__map-tools {
+        display: none !important;
+    }
+
+    /* Show the map for printing */
+    .app__map {
+        visibility: visible;
+        position: fixed !important;
+        bottom: 0;
+        height: 50% !important;
+        width: 100% !important;
+        page-break-before: always;
+    }
+
+    .app__map * {
+        visibility: visible;
+    }
+
+    /* Format the trip detail content */
+    .trip-detail-container {
+        background: white;
+        box-shadow: none;
+        max-height: none;
+        overflow: visible;
+        margin-bottom: 0;
+        padding-bottom: 40px;
+    }
+
+    /* Remove any max-height/overflow restrictions */
+    .trip-detail {
+        max-height: none !important;
+        overflow: visible !important;
+    }
+
+    /* Ensure text is readable */
+    .trip-detail-title h1 {
+        color: black !important;
+    }
+}

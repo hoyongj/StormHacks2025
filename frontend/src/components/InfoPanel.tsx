@@ -247,13 +247,6 @@ function InfoPanel({
                         <div className="info__summary-actions">
                             <button
                                 type="button"
-                                className="info__pdf-button"
-                                onClick={handleGeneratePdf}
-                            >
-                                Download PDF
-                            </button>
-                            <button
-                                type="button"
                                 className="info__view-details"
                                 onClick={() => onViewDetails && onViewDetails()}
                             >
