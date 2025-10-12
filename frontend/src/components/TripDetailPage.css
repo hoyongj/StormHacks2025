@@ -29,10 +29,30 @@
     max-width: 900px;
     max-height: 90vh;
     overflow-y: auto;
+    overflow-x: hidden;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
     display: flex;
     flex-direction: column;
     animation: slide-up 0.3s ease-out;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(127, 90, 240, 0.5) transparent;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.trip-detail-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.trip-detail-container::-webkit-scrollbar-track {
+    background: transparent;
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+.trip-detail-container::-webkit-scrollbar-thumb {
+    background-color: rgba(127, 90, 240, 0.5);
+    border-radius: 10px;
+    border: 2px solid #ffffff;
 }
 
 @keyframes slide-up {
@@ -54,7 +74,7 @@
     justify-content: space-between;
     align-items: flex-start;
     padding: 1.5rem 2rem;
-    background: linear-gradient(135deg, #7f5af0, #2cb1bc);
+    background: linear-gradient(135deg, #1a3cff, #7f5af0);
     border-radius: 20px 20px 0 0;
     color: white;
 }
@@ -148,7 +168,7 @@
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    background-color: #1a3cff;
+    background-color: #7f5af0;
     color: white;
     display: flex;
     align-items: center;
@@ -163,7 +183,7 @@
     left: 50%;
     width: 2px;
     height: calc(100% - 16px);
-    background-color: #ddd;
+    background-color: #cacefd;
     transform: translateX(-50%);
     z-index: 1;
 }
@@ -200,7 +220,7 @@
 
 .trip-detail-travel-info {
     display: flex;
-    align-items: center;
+    flex-direction: column;
     margin-top: 0.75rem;
     padding-top: 0.75rem;
     border-top: 1px dashed #eee;
@@ -209,11 +229,53 @@
 .trip-detail-travel-mode {
     font-size: 1.2rem;
     margin-right: 0.75rem;
+    display: flex;
+    align-items: center;
 }
 
 .trip-detail-travel-time {
     color: #666;
     font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.trip-detail-travel-segments {
+    margin-top: 0.5rem;
+}
+
+.trip-detail-travel-segment {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0.75rem;
+    padding: 0.5rem;
+    border-left: 3px solid #eee;
+}
+
+.trip-detail-travel-segment-mode {
+    display: flex;
+    align-items: center;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+}
+
+.trip-detail-travel-segment-mode span {
+    margin-left: 0.5rem;
+}
+
+.trip-detail-travel-segment-info {
+    margin-left: 1.75rem;
+    font-size: 0.9rem;
+    color: #555;
+}
+
+.trip-detail-travel-instructions {
+    margin-bottom: 0.25rem;
+}
+
+.trip-detail-travel-segment-duration {
+    font-size: 0.85rem;
+    color: #777;
 }
 
 .trip-detail-stops {
@@ -481,7 +543,7 @@
 }
 
 .trip-detail-action.primary {
-    background: linear-gradient(135deg, #7f5af0, #2cb1bc);
+    background: linear-gradient(135deg, #1a3cff, #7f5af0);
     border: none;
     color: white;
     box-shadow: 0 4px 12px rgba(127, 90, 240, 0.22);

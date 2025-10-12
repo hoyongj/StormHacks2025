@@ -55,11 +55,15 @@ export default function TripDetailPage({
                     </div>
                 </header>
 
-                <main className="trip-detail-content">
+                <main
+                    className="trip-detail-content"
+                    data-plan-title={plan.title || "Untitled Plan"}
+                >
                     <h2>Itinerary</h2>
                     <div className="trip-detail-timeline">
                         {plan.stops.map((stop, index) => {
                             const nextStop = plan.stops[index + 1];
+                            // Get segments that START from this stop
                             const stopSegments = routeSegments.filter(
                                 (s) => s.fromIndex === index
                             );
@@ -100,18 +104,67 @@ export default function TripDetailPage({
                                             </div>
                                         )}
 
-                                        {nextStop && travelInfo && (
-                                            <div className="trip-detail-travel-info">
-                                                <div className="trip-detail-travel-mode">
-                                                    {getTravelModeIcon(
-                                                        stopSegments[0]?.mode
-                                                    )}
+                                        {nextStop &&
+                                            stopSegments.length > 0 && (
+                                                <div className="trip-detail-travel-info">
+                                                    <div className="trip-detail-travel-time">
+                                                        {getTravelInfo(
+                                                            stopSegments
+                                                        )}
+                                                    </div>
+
+                                                    {/* Display detailed instructions for this leg */}
+                                                    <div className="trip-detail-travel-segments">
+                                                        {stopSegments.map(
+                                                            (seg, idx) => {
+                                                                // Only show segments for this specific route leg
+                                                                if (
+                                                                    seg.fromIndex ===
+                                                                        index &&
+                                                                    seg.toIndex ===
+                                                                        index +
+                                                                            1
+                                                                ) {
+                                                                    return (
+                                                                        <div
+                                                                            key={`segment-${index}-${idx}`}
+                                                                            className="trip-detail-travel-segment"
+                                                                        >
+                                                                            <div className="trip-detail-travel-segment-mode">
+                                                                                {getTravelModeIcon(
+                                                                                    seg.mode
+                                                                                )}
+                                                                                <span>
+                                                                                    {getTravelModeLabel(
+                                                                                        seg.mode
+                                                                                    )}
+                                                                                </span>
+                                                                            </div>
+                                                                            <div className="trip-detail-travel-segment-info">
+                                                                                {seg.instructions && (
+                                                                                    <div className="trip-detail-travel-instructions">
+                                                                                        {
+                                                                                            seg.instructions
+                                                                                        }
+                                                                                    </div>
+                                                                                )}
+                                                                                <div className="trip-detail-travel-segment-duration">
+                                                                                    {seg.durationText ||
+                                                                                        ""}
+                                                                                    {seg.distanceText
+                                                                                        ? ` • ${seg.distanceText}`
+                                                                                        : ""}
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                }
+                                                                return null;
+                                                            }
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <div className="trip-detail-travel-time">
-                                                    {travelInfo}
-                                                </div>
-                                            </div>
-                                        )}
+                                            )}
                                     </div>
                                 </div>
                             );
@@ -197,6 +250,24 @@ function getTravelModeIcon(mode?: string): string {
     }
 }
 
+function getTravelModeLabel(mode?: string): string {
+    if (!mode) return "Travel";
+    const m = mode.toLowerCase();
+    if (m === "walking" || m === "walk") return "Walk";
+    if (m === "driving" || m === "drive") return "Drive";
+    if (m === "bicycling" || m === "bicycle") return "Bike";
+    if (m === "transit") return "Transit";
+    if (m === "bus") return "Bus";
+    if (m === "train") return "Train";
+    if (m === "subway") return "Subway";
+    if (m === "tram") return "Tram";
+    if (m === "ferry") return "Ferry";
+    if (m === "expo" || m.includes("expo")) return "SkyTrain - Expo Line";
+    if (m.includes("canada")) return "SkyTrain - Canada Line";
+    if (m.includes("millennium")) return "SkyTrain - Millennium Line";
+    return mode.charAt(0).toUpperCase() + mode.slice(1).toLowerCase();
+}
+
 function getTravelInfo(segments: RouteSegment[]): string | null {
     if (!segments.length) return null;
 
@@ -217,6 +288,6 @@ function getTravelInfo(segments: RouteSegment[]): string | null {
 
     const formattedDuration = formatTripDuration(totalMinutes);
     return totalDistance
-        ? `${formattedDuration} • ${totalDistance}`
-        : formattedDuration;
+        ? `Total: ${formattedDuration} • ${totalDistance}`
+        : `Total: ${formattedDuration}`;
 }
