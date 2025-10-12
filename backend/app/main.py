@@ -2,11 +2,18 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from .dependencies import get_google_maps_api_key
-from .repository import get_plan, init_db, list_plans as fetch_travel_plans, save_plan, seed_admin
+from .repository import (
+    delete_plan as remove_plan,
+    get_plan,
+    init_db,
+    list_plans as fetch_travel_plans,
+    save_plan,
+    seed_admin,
+)
 from .schemas import (
     ChatRequest,
     ChatResponse,
@@ -25,6 +32,7 @@ from .services.gemini import GeminiClient
 from .services.maps import MapsClient
 from .services.tripadvisor import TripAdvisorService
 from .auth import controller as auth_controller
+from .auth.service import CurrentUser
 
 app = FastAPI(title="Pathfinder API", version="0.1.0")
 
@@ -51,11 +59,25 @@ def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
 
+def _require_user_id(current_user: CurrentUser) -> str:
+    user_id = current_user.user_id
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid authentication credentials")
+    return user_id
+
+
 @app.post("/api/generate-plan", response_model=TravelPlan)
-async def generate_plan(request: PromptRequest) -> TravelPlan:
+async def generate_plan(request: PromptRequest, current_user: CurrentUser) -> TravelPlan:
+    user_id = _require_user_id(current_user)
     plan = await gemini_client.suggest_plan(request.prompt)
-    save_plan(plan)
-    return plan
+    try:
+        save_plan(plan, user_id)
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="You cannot modify this plan") from None
+    stored = get_plan(plan.id, user_id)
+    if not stored:
+        raise HTTPException(status_code=500, detail="Failed to persist plan")
+    return stored
 
 
 @app.post("/api/assistant/chat", response_model=ChatResponse)
@@ -65,25 +87,40 @@ async def assistant_chat(request: ChatRequest) -> ChatResponse:
 
 
 @app.get("/api/plans", response_model=SuggestionOptions)
-async def list_plans_endpoint() -> SuggestionOptions:
-    return SuggestionOptions(options=fetch_travel_plans())
+async def list_plans_endpoint(current_user: CurrentUser) -> SuggestionOptions:
+    user_id = _require_user_id(current_user)
+    return SuggestionOptions(options=fetch_travel_plans(user_id))
 
 
 @app.put("/api/plan/{plan_id}", response_model=TravelPlan)
-async def update_plan(plan_id: str, plan: TravelPlan) -> TravelPlan:
+async def update_plan(plan_id: str, plan: TravelPlan, current_user: CurrentUser) -> TravelPlan:
+    user_id = _require_user_id(current_user)
     if plan.id != plan_id:
         raise HTTPException(status_code=400, detail="Plan ID mismatch")
 
-    save_plan(plan)
-    updated = get_plan(plan_id)
+    try:
+        save_plan(plan, user_id)
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="You cannot modify this plan") from None
+    updated = get_plan(plan_id, user_id)
     if not updated:
         raise HTTPException(status_code=500, detail="Failed to persist plan")
     return updated
 
 
+@app.delete("/api/plan/{plan_id}", status_code=204)
+def delete_plan(plan_id: str, current_user: CurrentUser) -> Response:
+    user_id = _require_user_id(current_user)
+    removed = remove_plan(plan_id, user_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    return Response(status_code=204)
+
+
 @app.get("/api/plan/{plan_id}/route", response_model=MapRoute)
-async def get_route(plan_id: str) -> MapRoute:
-    plan = get_plan(plan_id)
+async def get_route(plan_id: str, current_user: CurrentUser) -> MapRoute:
+    user_id = _require_user_id(current_user)
+    plan = get_plan(plan_id, user_id)
     if not plan:
         raise HTTPException(status_code=404, detail="Plan not found")
 
@@ -98,8 +135,9 @@ async def get_route(plan_id: str) -> MapRoute:
 
 
 @app.get("/api/plan/{plan_id}/route-multileg", response_model=MultiLegRoute)
-async def get_route_multileg(plan_id: str) -> MultiLegRoute:
-    plan = get_plan(plan_id)
+async def get_route_multileg(plan_id: str, current_user: CurrentUser) -> MultiLegRoute:
+    user_id = _require_user_id(current_user)
+    plan = get_plan(plan_id, user_id)
     if not plan:
         raise HTTPException(status_code=404, detail="Plan not found")
 

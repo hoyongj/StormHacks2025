@@ -23,7 +23,8 @@ def init_db() -> None:
                 id TEXT PRIMARY KEY,
                 title TEXT NOT NULL,
                 summary TEXT NOT NULL,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                owner_id TEXT
             )
             """
         )
@@ -44,6 +45,19 @@ def init_db() -> None:
         )
         _ensure_column(conn, "plan_stops", "latitude", "REAL")
         _ensure_column(conn, "plan_stops", "longitude", "REAL")
+        _ensure_column(conn, "plans", "owner_id", "TEXT")
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_plans_owner_id ON plans(owner_id)
+            """
+        )
+        conn.execute(
+            """
+            UPDATE plans
+            SET owner_id = NULL
+            WHERE owner_id IS NULL OR owner_id = '' OR owner_id = 'default-user'
+            """
+        )
         conn.commit()
 
         # Create a simple users table for lightweight authentication storage.
@@ -83,15 +97,40 @@ def list_plan_ids() -> List[str]:
     return [row[0] for row in rows]
 
 
-def save_plan(plan: TravelPlan) -> None:
+UNASSIGNED_OWNER_VALUES = {None, "", "default-user"}
+
+
+def save_plan(plan: TravelPlan, owner_id: Optional[str]) -> None:
     with get_connection() as conn:
+        existing_owner = conn.execute(
+            "SELECT owner_id FROM plans WHERE id = ?",
+            (plan.id,),
+        ).fetchone()
+        if existing_owner:
+            owner_value = existing_owner[0]
+            if (
+                owner_value
+                and owner_value not in UNASSIGNED_OWNER_VALUES
+                and owner_value != owner_id
+            ):
+                raise PermissionError("Plan belongs to a different user.")
+
         conn.execute(
-            "INSERT OR REPLACE INTO plans (id, title, summary, created_at) VALUES (?, ?, ?, ?)",
+            """
+            INSERT INTO plans (id, title, summary, created_at, owner_id)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                title=excluded.title,
+                summary=excluded.summary,
+                created_at=excluded.created_at,
+                owner_id=excluded.owner_id
+            """,
             (
                 plan.id,
                 plan.title,
                 plan.summary,
                 plan.created_at.isoformat(),
+                owner_id,
             ),
         )
         conn.execute("DELETE FROM plan_stops WHERE plan_id = ?", (plan.id,))
@@ -114,10 +153,11 @@ def save_plan(plan: TravelPlan) -> None:
         conn.commit()
 
 
-def list_plans() -> List[TravelPlan]:
+def list_plans(owner_id: str) -> List[TravelPlan]:
     with get_connection() as conn:
         plan_rows = conn.execute(
-            "SELECT id, title, summary, created_at FROM plans ORDER BY created_at DESC"
+            "SELECT id, title, summary, created_at FROM plans WHERE owner_id = ? ORDER BY created_at DESC",
+            (owner_id,),
         ).fetchall()
         plans = []
         for row in plan_rows:
@@ -135,11 +175,11 @@ def list_plans() -> List[TravelPlan]:
     return plans
 
 
-def get_plan(plan_id: str) -> Optional[TravelPlan]:
+def get_plan(plan_id: str, owner_id: str) -> Optional[TravelPlan]:
     with get_connection() as conn:
         row = conn.execute(
-            "SELECT id, title, summary, created_at FROM plans WHERE id = ?",
-            (plan_id,),
+            "SELECT id, title, summary, created_at FROM plans WHERE id = ? AND owner_id = ?",
+            (plan_id, owner_id),
         ).fetchone()
         if not row:
             return None
@@ -151,6 +191,16 @@ def get_plan(plan_id: str) -> Optional[TravelPlan]:
             createdAt=datetime.fromisoformat(row[3]),
             stops=stops,
         )
+
+
+def delete_plan(plan_id: str, owner_id: str) -> bool:
+    with get_connection() as conn:
+        cursor = conn.execute(
+            "DELETE FROM plans WHERE id = ? AND owner_id = ?",
+            (plan_id, owner_id),
+        )
+        conn.commit()
+        return cursor.rowcount > 0
 
 
 def _fetch_stops(conn: sqlite3.Connection, plan_id: str) -> List[PlanStop]:
@@ -208,7 +258,7 @@ def seed_sample_plan() -> None:
             )
         ],
     )
-    save_plan(sample)
+    save_plan(sample, owner_id=None)
 
 
 def seed_ubc_plan() -> None:
@@ -244,7 +294,7 @@ def seed_ubc_plan() -> None:
             ),
         ],
     )
-    save_plan(sample)
+    save_plan(sample, owner_id=None)
 
 
 def seed_admin() -> None:

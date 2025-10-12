@@ -24,6 +24,8 @@ type MultiLegRoute = {
     legs: MultiLegLeg[];
 };
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
+
 const DEFAULT_CENTER: google.maps.LatLngLiteral = {
     lat: 49.2796,
     lng: -122.9199,
@@ -32,6 +34,14 @@ const EMBEDDED_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 const MAPS_MAP_ID: string =
     import.meta.env.VITE_GOOGLE_MAPS_MAP_ID || "DEMO_MAP_ID";
 const LEG_COLORS = ["#1a3cff", "#7F5AF0", "#2CB1BC", "#EF4444", "#10B981"];
+
+function authHeaders(): Record<string, string> {
+    if (typeof window === "undefined") {
+        return {};
+    }
+    const token = localStorage.getItem("auth_token");
+    return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 function MapView({
     plan,
@@ -65,12 +75,13 @@ function MapView({
         let cancelled = false;
 
         async function fetchMapsKey() {
-            const baseUrl = window.location.origin;
-            const endpoint = `${baseUrl}/api/config/maps-key`;
+            const endpoint = `${API_BASE_URL}/config/maps-key`;
             setIsLoadingKey(true);
 
             try {
-                const response = await fetch(endpoint);
+                const response = await fetch(endpoint, {
+                    headers: authHeaders(),
+                });
                 if (!response.ok) {
                     throw new Error("Key not configured");
                 }
@@ -430,7 +441,12 @@ function MapView({
         clearRoute();
         clearMultiLegRoutes();
         try {
-            const response = await fetch(`/api/plan/${planId}/route`);
+            const response = await fetch(
+                `${API_BASE_URL}/plan/${planId}/route`,
+                {
+                    headers: authHeaders(),
+                }
+            );
             if (!response.ok) {
                 return;
             }
@@ -464,7 +480,12 @@ function MapView({
         clearRoute();
         clearMultiLegRoutes();
         try {
-            const response = await fetch(`/api/plan/${planId}/route-multileg`);
+            const response = await fetch(
+                `${API_BASE_URL}/plan/${planId}/route-multileg`,
+                {
+                    headers: authHeaders(),
+                }
+            );
             if (!response.ok) {
                 throw new Error("Failed to load multi-leg route");
             }

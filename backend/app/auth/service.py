@@ -8,6 +8,7 @@ from typing import Annotated
 from uuid import UUID, uuid4
 from passlib.context import CryptContext
 from jose import JWTError, jwt
+from fastapi import Depends
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from . import models
 from ..repository import get_connection
@@ -122,11 +123,11 @@ def register_user(conn: sqlite3.Connection, register_user_request: models.Regist
         raise
 
 
-def get_current_user(token: Annotated[str, Annotated[str, OAuth2PasswordBearer(tokenUrl='/auth/token')]]) -> models.TokenData:
+def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]) -> models.TokenData:
     return verify_token(token)
 
 
-CurrentUser = Annotated[models.TokenData, Annotated[models.TokenData, get_current_user]]
+CurrentUser = Annotated[models.TokenData, Depends(get_current_user)]
 
 
 def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm, Annotated[OAuth2PasswordRequestForm, None]], conn: sqlite3.Connection) -> models.Token:

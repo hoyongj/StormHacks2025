@@ -117,6 +117,68 @@ export type Folder = {
     planIds: string[];
 };
 
+const FOLDER_STORAGE_PREFIX = "plan-folders";
+
+function folderStorageKey(email: string | null): string {
+    return email ? `${FOLDER_STORAGE_PREFIX}:${email}` : `${FOLDER_STORAGE_PREFIX}:guest`;
+}
+
+function loadStoredFolders(email: string | null): Folder[] {
+    if (typeof window === "undefined") {
+        return [];
+    }
+    try {
+        const raw = window.localStorage.getItem(folderStorageKey(email));
+        if (!raw) {
+            return [];
+        }
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) {
+            return [];
+        }
+        const folders: Folder[] = [];
+        parsed.forEach((item) => {
+            if (
+                item &&
+                typeof item === "object" &&
+                typeof item.id === "string" &&
+                item.id !== "all" &&
+                typeof item.name === "string" &&
+                Array.isArray(item.planIds)
+            ) {
+                const planIds = item.planIds.filter(
+                    (value: unknown): value is string => typeof value === "string"
+                );
+                folders.push({ id: item.id, name: item.name, planIds });
+            }
+        });
+        return folders;
+    } catch {
+        return [];
+    }
+}
+
+function saveStoredFolders(email: string | null, folders: Folder[]): void {
+    if (typeof window === "undefined") {
+        return;
+    }
+    try {
+        const payload = folders
+            .filter((folder) => folder.id !== "all")
+            .map((folder) => ({
+                id: folder.id,
+                name: folder.name,
+                planIds: folder.planIds,
+            }));
+        window.localStorage.setItem(
+            folderStorageKey(email),
+            JSON.stringify(payload)
+        );
+    } catch {
+        // ignore storage errors
+    }
+}
+
 export type UserProfile = {
     name: string;
     email: string;
@@ -199,6 +261,34 @@ function decodeJwtEmail(token: string | null): string | null {
     }
 }
 
+function arraysShallowEqual<T>(a: T[], b: T[]): boolean {
+    if (a === b) {
+        return true;
+    }
+    if (a.length !== b.length) {
+        return false;
+    }
+    for (let index = 0; index < a.length; index += 1) {
+        if (a[index] !== b[index]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+function buildAuthHeaders(
+    base?: Record<string, string>
+): Record<string, string> {
+    const headers: Record<string, string> = base ? { ...base } : {};
+    if (typeof window !== "undefined") {
+        const token = localStorage.getItem("auth_token");
+        if (token) {
+            headers.Authorization = `Bearer ${token}`;
+        }
+    }
+    return headers;
+}
+
 function loadProfileForEmail(email: string | null): UserProfile | null {
     try {
         const key = email ? `profile:${email}` : "profile:guest";
@@ -231,9 +321,9 @@ function App() {
     // Simple auth guard: if no token, redirect to /auth and pause rendering
     const isBrowser = typeof window !== "undefined";
     const isAuthPage = isBrowser && window.location.pathname === "/auth";
-    const [hasToken] = useState<boolean>(
-        () => isBrowser && !!localStorage.getItem("auth_token")
-    );
+    const initialToken = isBrowser ? localStorage.getItem("auth_token") : null;
+    const initialEmail = decodeJwtEmail(initialToken);
+    const [hasToken] = useState<boolean>(() => isBrowser && !!initialToken);
 
     useEffect(() => {
         if (!isAuthPage && !hasToken && isBrowser) {
@@ -250,6 +340,7 @@ function App() {
     if (!hasToken) {
         return null;
     }
+    const [folderOwnerEmail] = useState<string | null>(() => initialEmail);
     const [plans, setPlans] = useState<TravelPlan[]>([]);
     const [selectedPlanId, setSelectedPlanId] = useState<string>("");
     const [error, setError] = useState<string | null>(null);
@@ -286,27 +377,28 @@ function App() {
         }
         return "planner";
     });
-    const [folders, setFolders] = useState<Folder[]>([
+    const [folders, setFolders] = useState<Folder[]>(() => [
         { id: "all", name: "All Plans", planIds: [] },
+        ...loadStoredFolders(initialEmail),
     ]);
     const [libraryFolderId, setLibraryFolderId] = useState("all");
     const [profile, setProfile] = useState<UserProfile>(() => {
-        const token =
-            typeof window !== "undefined"
-                ? localStorage.getItem("auth_token")
-                : null;
-        const emailFromToken = decodeJwtEmail(token);
         const stored =
-            typeof window !== "undefined"
-                ? loadProfileForEmail(emailFromToken)
+            isBrowser && typeof initialEmail !== "undefined"
+                ? loadProfileForEmail(initialEmail)
                 : null;
         if (stored) return stored;
         // default if nothing stored
         return {
-            name: emailFromToken ? emailFromToken.split("@")[0] : "Jamie Hoang",
-            email: emailFromToken ?? "jamie.hoang@example.com",
+            name: initialEmail
+                ? initialEmail.split("@")[0]
+                : "Jamie Hoang",
+            email: initialEmail ?? "jamie.hoang@example.com",
         };
     });
+    const planPersistTimers = useRef<Map<string, number>>(new Map());
+    const plansRef = useRef<TravelPlan[]>([]);
+    const draftPlanRef = useRef<TravelPlan | null>(null);
 
     // Persist profile per-user whenever it changes
     useEffect(() => {
@@ -320,6 +412,10 @@ function App() {
             setLibraryFolderId("all");
         }
     }, [folders, libraryFolderId]);
+
+    useEffect(() => {
+        saveStoredFolders(folderOwnerEmail, folders);
+    }, [folders, folderOwnerEmail]);
 
     useEffect(() => {
         if (typeof window === "undefined") {
@@ -339,6 +435,18 @@ function App() {
     const [isDraftDirty, setIsDraftDirty] = useState(false);
     const latestAdvisorRequest = useRef(0);
 
+    useEffect(() => {
+        return () => {
+            if (typeof window === "undefined") {
+                return;
+            }
+            planPersistTimers.current.forEach((timeoutId) =>
+                window.clearTimeout(timeoutId)
+            );
+            planPersistTimers.current.clear();
+        };
+    }, []);
+
     const selectedPlan = useMemo(
         () => plans.find((plan) => plan.id === selectedPlanId) ?? null,
         [plans, selectedPlanId]
@@ -349,6 +457,9 @@ function App() {
         [workingPlan]
     );
     const stopCount = workingPlanStops.length;
+
+    plansRef.current = plans;
+    draftPlanRef.current = draftPlan;
 
     const selectedStop = useMemo(() => {
         if (!workingPlan || !selectedStopRef) {
@@ -374,6 +485,86 @@ function App() {
             setMapMode("single");
         }
     }, [mapMode, stopCount]);
+
+    function cancelScheduledPlanPersist(planId: string) {
+        const timers = planPersistTimers.current;
+        const timeoutId = timers.get(planId);
+        if (timeoutId && typeof window !== "undefined") {
+            window.clearTimeout(timeoutId);
+        }
+        timers.delete(planId);
+    }
+
+    function schedulePlanPersist(planId: string) {
+        if (typeof window === "undefined") {
+            return;
+        }
+        cancelScheduledPlanPersist(planId);
+        const timeoutId = window.setTimeout(() => {
+            void persistPlan(planId);
+        }, 700);
+        planPersistTimers.current.set(planId, timeoutId);
+    }
+
+    async function persistPlan(planId: string) {
+        const plan = plansRef.current.find((item) => item.id === planId);
+        if (!plan) {
+            cancelScheduledPlanPersist(planId);
+            return;
+        }
+
+        cancelScheduledPlanPersist(planId);
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/plan/${planId}`, {
+                method: "PUT",
+                headers: buildAuthHeaders({
+                    "Content-Type": "application/json",
+                }),
+                body: JSON.stringify(serializePlanForSave(plan)),
+            });
+
+            if (!response.ok) {
+                throw new Error("Failed to save plan");
+            }
+
+            const payload: TravelPlanResponse = await response.json();
+            const savedPlan = normalizePlan(payload);
+            const draftMatches = draftPlanRef.current?.id === savedPlan.id;
+
+            setPlans((prev) => {
+                const index = prev.findIndex(
+                    (item) => item.id === savedPlan.id
+                );
+                if (index === -1) {
+                    return [savedPlan, ...prev];
+                }
+                const next = [...prev];
+                next[index] = savedPlan;
+                return next;
+            });
+
+            if (draftMatches) {
+                setDraftPlan((prev) =>
+                    prev && prev.id === savedPlan.id
+                        ? {
+                              ...prev,
+                              title: savedPlan.title,
+                              summary: savedPlan.summary,
+                              createdAt: savedPlan.createdAt,
+                          }
+                        : prev
+                );
+            }
+
+            setError(null);
+        } catch (err) {
+            console.error("Failed to persist plan", err);
+            setError(
+                "Unable to save plan changes. Please check your connection and try again."
+            );
+        }
+    }
 
     useEffect(() => {
         if (!selectedPlan) {
@@ -426,7 +617,9 @@ function App() {
     useEffect(() => {
         async function loadPlans() {
             try {
-                const response = await fetch(`${API_BASE_URL}/plans`);
+                const response = await fetch(`${API_BASE_URL}/plans`, {
+                    headers: buildAuthHeaders(),
+                });
                 if (!response.ok) {
                     throw new Error("Unable to load travel plans");
                 }
@@ -456,36 +649,58 @@ function App() {
     }, []);
 
     useEffect(() => {
+        if (isLoading) {
+            return;
+        }
         setFolders((prev) => {
             const planIds = plans.map((plan) => plan.id);
             const validIds = new Set(planIds);
+            const hasAll = prev.some((folder) => folder.id === "all");
+            let changed = false;
 
-            const byId = new Map<string, Folder>();
-            prev.forEach((folder) => {
-                byId.set(folder.id, {
-                    ...folder,
-                    planIds:
-                        folder.id === "all"
-                            ? planIds
-                            : folder.planIds.filter((id) => validIds.has(id)),
-                });
+            const updated: Folder[] = prev.map((folder) => {
+                if (folder.id === "all") {
+                    if (arraysShallowEqual(folder.planIds, planIds)) {
+                        return folder;
+                    }
+                    changed = true;
+                    return { ...folder, planIds };
+                }
+                const filtered = folder.planIds.filter((id) => validIds.has(id));
+                if (arraysShallowEqual(filtered, folder.planIds)) {
+                    return folder;
+                }
+                changed = true;
+                return { ...folder, planIds: filtered };
             });
 
-            if (!byId.has("all")) {
-                byId.set("all", { id: "all", name: "All Plans", planIds });
-            } else {
-                byId.set("all", { id: "all", name: "All Plans", planIds });
+            if (!hasAll) {
+                changed = true;
+                updated.push({ id: "all", name: "All Plans", planIds });
             }
 
-            const next = Array.from(byId.values());
-            next.sort((a, b) => {
+            updated.sort((a, b) => {
                 if (a.id === "all") return -1;
                 if (b.id === "all") return 1;
                 return a.name.localeCompare(b.name);
             });
-            return next;
+
+            if (!changed && updated.length === prev.length) {
+                let identical = true;
+                for (let i = 0; i < updated.length; i += 1) {
+                    if (updated[i] !== prev[i]) {
+                        identical = false;
+                        break;
+                    }
+                }
+                if (identical) {
+                    return prev;
+                }
+            }
+
+            return updated;
         });
-    }, [plans]);
+    }, [plans, isLoading]);
 
     useEffect(() => {
         if (
@@ -504,7 +719,10 @@ function App() {
             try {
                 if (mapMode === "multileg") {
                     const response = await fetch(
-                        `${API_BASE_URL}/plan/${currentPlanId}/route-multileg`
+                        `${API_BASE_URL}/plan/${currentPlanId}/route-multileg`,
+                        {
+                            headers: buildAuthHeaders(),
+                        }
                     );
                     if (!response.ok) {
                         throw new Error("Failed to load multi-leg route");
@@ -531,7 +749,10 @@ function App() {
                     }
                 } else {
                     const response = await fetch(
-                        `${API_BASE_URL}/plan/${currentPlanId}/route`
+                        `${API_BASE_URL}/plan/${currentPlanId}/route`,
+                        {
+                            headers: buildAuthHeaders(),
+                        }
                     );
                     if (!response.ok) {
                         throw new Error("Failed to load route details");
@@ -664,20 +885,40 @@ function App() {
         setMapRefreshKey((value) => value + 1);
     };
 
-    const handlePlanTitleChange = (planId: string, title: string) => {
-        setPlans((prev) =>
-            prev.map((plan) =>
-                plan.id === planId ? { ...plan, title: title || "" } : plan
-            )
-        );
-    };
-
     const handlePlanSummaryChange = (planId: string, summary: string) => {
+        const existing = plansRef.current.find((plan) => plan.id === planId);
+        if (!existing) {
+            return;
+        }
+        const nextSummary = summary ?? "";
+        if (existing.summary === nextSummary) {
+            if (
+                draftPlan &&
+                draftPlan.id === planId &&
+                draftPlan.summary !== nextSummary
+            ) {
+                setDraftPlan((prev) =>
+                    prev ? { ...prev, summary: nextSummary } : prev
+                );
+            }
+            return;
+        }
+
         setPlans((prev) =>
             prev.map((plan) =>
-                plan.id === planId ? { ...plan, summary: summary || "" } : plan
+                plan.id === planId
+                    ? { ...plan, summary: nextSummary }
+                    : plan
             )
         );
+
+        if (draftPlan && draftPlan.id === planId) {
+            setDraftPlan((prev) =>
+                prev ? { ...prev, summary: nextSummary } : prev
+            );
+        }
+
+        schedulePlanPersist(planId);
     };
 
     const normaliseLocationResult = (raw: any): LocationSearchResult | null => {
@@ -1021,14 +1262,16 @@ function App() {
             return;
         }
 
+        cancelScheduledPlanPersist(draftPlan.id);
+
         try {
             const response = await fetch(
                 `${API_BASE_URL}/plan/${draftPlan.id}`,
                 {
                     method: "PUT",
-                    headers: {
+                    headers: buildAuthHeaders({
                         "Content-Type": "application/json",
-                    },
+                    }),
                     body: JSON.stringify(serializePlanForSave(draftPlan)),
                 }
             );
@@ -1221,38 +1464,113 @@ function App() {
     };
 
     const handleUpdatePlanTitle = (planId: string, title: string) => {
-        setPlans((prev) =>
-            prev.map((p) => (p.id === planId ? { ...p, title } : p))
-        );
-        if (draftPlan && draftPlan.id === planId) {
-            setDraftPlan((prev) => (prev ? { ...prev, title } : prev));
-            setIsDraftDirty(true);
+        const existing = plansRef.current.find((plan) => plan.id === planId);
+        if (!existing) {
+            return;
         }
+        const nextTitle = title ?? "";
+        if (existing.title === nextTitle) {
+            if (draftPlan && draftPlan.id === planId && draftPlan.title !== nextTitle) {
+                setDraftPlan((prev) => (prev ? { ...prev, title: nextTitle } : prev));
+            }
+            return;
+        }
+
+        setPlans((prev) =>
+            prev.map((plan) =>
+                plan.id === planId ? { ...plan, title: nextTitle } : plan
+            )
+        );
+
+        if (draftPlan && draftPlan.id === planId) {
+            setDraftPlan((prev) =>
+                prev ? { ...prev, title: nextTitle } : prev
+            );
+        }
+
+        schedulePlanPersist(planId);
     };
 
     const handleUpdatePlanDate = (planId: string, isoDate: string) => {
-        const createdAt = new Date(isoDate).toISOString();
-        setPlans((prev) =>
-            prev.map((p) => (p.id === planId ? { ...p, createdAt } : p))
-        );
-        if (draftPlan && draftPlan.id === planId) {
-            setDraftPlan((prev) => (prev ? { ...prev, createdAt } : prev));
-            setIsDraftDirty(true);
+        if (!isoDate) {
+            return;
         }
+        const existing = plansRef.current.find((plan) => plan.id === planId);
+        if (!existing) {
+            return;
+        }
+        const parsed = new Date(isoDate);
+        if (Number.isNaN(parsed.getTime())) {
+            return;
+        }
+        const createdAt = parsed.toISOString();
+        if (existing.createdAt === createdAt) {
+            if (
+                draftPlan &&
+                draftPlan.id === planId &&
+                draftPlan.createdAt !== createdAt
+            ) {
+                setDraftPlan((prev) =>
+                    prev ? { ...prev, createdAt } : prev
+                );
+            }
+            return;
+        }
+
+        setPlans((prev) =>
+            prev.map((plan) =>
+                plan.id === planId ? { ...plan, createdAt } : plan
+            )
+        );
+
+        if (draftPlan && draftPlan.id === planId) {
+            setDraftPlan((prev) =>
+                prev ? { ...prev, createdAt } : prev
+            );
+        }
+
+        schedulePlanPersist(planId);
     };
 
-    const handleDeletePlan = (planId: string) => {
+    const handleDeletePlan = async (planId: string) => {
+        const existing = plansRef.current.find((plan) => plan.id === planId);
+        if (!existing) {
+            return;
+        }
+
+        cancelScheduledPlanPersist(planId);
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/plan/${planId}`, {
+                method: "DELETE",
+                headers: buildAuthHeaders(),
+            });
+
+            if (!response.ok && response.status !== 404) {
+                throw new Error("Failed to delete plan");
+            }
+        } catch (err) {
+            console.error("Failed to delete plan", err);
+            setError("Unable to delete plan. Please try again.");
+            return;
+        }
+
         setPlans((prev) => {
             const updated = prev.filter((plan) => plan.id !== planId);
+            if (prev.length === updated.length) {
+                return prev;
+            }
             if (selectedPlanId === planId) {
                 const fallback = updated[0]?.id ?? "";
                 setSelectedPlanId(fallback);
                 setSelectedStopRef(null);
                 setAdvisorInfo(null);
                 setAdvisorError(null);
+                setRouteSegments([]);
             }
             return updated;
         });
+
         setFolders((prev) =>
             prev.map((folder) =>
                 folder.id === "all"
@@ -1263,6 +1581,13 @@ function App() {
                       }
             )
         );
+
+        if (draftPlanRef.current?.id === planId) {
+            setDraftPlan(null);
+            setIsDraftDirty(false);
+        }
+
+        setError(null);
     };
 
     const handleStopSelected = (stop: PlanStop, stopIndex: number) => {
@@ -1515,7 +1840,7 @@ function App() {
                             onSelectFolder={setLibraryFolderId}
                             selectedPlanId={selectedPlanId}
                             onSelectPlan={setSelectedPlanId}
-                            onUpdatePlanTitle={handlePlanTitleChange}
+                            onUpdatePlanTitle={handleUpdatePlanTitle}
                             onUpdatePlanSummary={handlePlanSummaryChange}
                             onDeletePlan={handleDeletePlan}
                             routeSegments={routeSegments}
