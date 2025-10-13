@@ -1196,63 +1196,60 @@ function App() {
     };
 
     const handleDraftMoveStop = (fromIndex: number, toIndex: number) => {
-        console.log("handleDraftMoveStop called", { fromIndex, toIndex });
-        let planIdForUpdate: string | null = null;
-        let normalizedFrom = fromIndex;
-        let normalizedTo = toIndex;
+        setDraftPlan((prevDraft) => {
+            const sourcePlan =
+                prevDraft ??
+                (selectedPlan ? clonePlan(selectedPlan) : null);
+            if (!sourcePlan || sourcePlan.stops.length < 2) {
+                return prevDraft;
+            }
 
-        setDraftPlan((prev) => {
-            if (!prev) {
-                return prev;
-            }
-            const maxIndex = prev.stops.length - 1;
-            if (maxIndex < 0) {
-                return prev;
-            }
-            normalizedFrom = Math.max(0, Math.min(normalizedFrom, maxIndex));
-            normalizedTo = Math.max(0, Math.min(normalizedTo, maxIndex));
+            const maxIndex = sourcePlan.stops.length - 1;
+            const normalizedFrom = Math.max(0, Math.min(fromIndex, maxIndex));
+            const normalizedTo = Math.max(0, Math.min(toIndex, maxIndex));
             if (normalizedFrom === normalizedTo) {
-                return prev;
+                return prevDraft ?? sourcePlan;
             }
-            planIdForUpdate = prev.id;
-            const stops = [...prev.stops];
-            const [moved] = stops.splice(normalizedFrom, 1);
-            stops.splice(normalizedTo, 0, moved);
+
+            const reorderedStops = [...sourcePlan.stops];
+            const [moved] = reorderedStops.splice(normalizedFrom, 1);
+            reorderedStops.splice(normalizedTo, 0, moved);
+
             setIsDraftDirty(true);
-            return { ...prev, stops };
-        });
-
-        if (planIdForUpdate !== null) {
-            const planId = planIdForUpdate;
-            const sourceIndex = normalizedFrom;
-            const targetIndex = normalizedTo;
-
             setSelectedStopRef((current) => {
-                if (!current || current.planId !== planId) {
+                if (!current || current.planId !== sourcePlan.id) {
                     return current;
                 }
-                if (current.index === sourceIndex) {
-                    return { planId, index: targetIndex };
+                if (current.index === normalizedFrom) {
+                    return { planId: sourcePlan.id, index: normalizedTo };
                 }
-                if (sourceIndex < targetIndex) {
+                if (normalizedFrom < normalizedTo) {
                     if (
-                        current.index > sourceIndex &&
-                        current.index <= targetIndex
+                        current.index > normalizedFrom &&
+                        current.index <= normalizedTo
                     ) {
-                        return { planId, index: current.index - 1 };
+                        return {
+                            planId: sourcePlan.id,
+                            index: current.index - 1,
+                        };
                     }
-                } else if (sourceIndex > targetIndex) {
+                } else if (normalizedFrom > normalizedTo) {
                     if (
-                        current.index >= targetIndex &&
-                        current.index < sourceIndex
+                        current.index >= normalizedTo &&
+                        current.index < normalizedFrom
                     ) {
-                        return { planId, index: current.index + 1 };
+                        return {
+                            planId: sourcePlan.id,
+                            index: current.index + 1,
+                        };
                     }
                 }
                 return current;
             });
             setRouteSegments([]);
-        }
+
+            return { ...sourcePlan, stops: reorderedStops };
+        });
     };
 
     const handleDraftRemoveStop = (stopIndex: number) => {
@@ -1938,9 +1935,7 @@ function App() {
                             onRemoveStop={
                                 draftPlan ? handleDraftRemoveStop : undefined
                             }
-                            onMoveStop={
-                                draftPlan ? handleDraftMoveStop : undefined
-                            }
+                    onMoveStop={handleDraftMoveStop}
                         />
                     </aside>
                 </div>

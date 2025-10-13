@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type CSSProperties,
+} from "react";
 import {
     DndContext,
     KeyboardSensor,
@@ -85,7 +91,6 @@ function SortableStopItem({
     itemRefs,
     activeFieldRef,
 }: SortableStopItemProps) {
-    console.log("Rendering SortableStopItem", { id, index });
     const {
         attributes,
         listeners,
@@ -93,7 +98,7 @@ function SortableStopItem({
         transform,
         transition,
         isDragging,
-    } = useSortable({ id });
+    } = useSortable({ id, disabled: detailInputsDisabled, data: { index } });
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -570,6 +575,10 @@ function ToGoList({
     );
 
     // Always enable drag per user request
+    // const enableDrag = Boolean(
+    //     onMoveStop && isEditable && formStops.length > 1
+    // );
+
     const enableDrag = true;
 
     // Display order: list of indices referencing formStops
@@ -600,10 +609,13 @@ function ToGoList({
     }, [formStops]);
 
     // Sortable ids are generated from display indices to keep them stable
-    const sortableIds = useMemo(
-        () => displayOrder.map((di) => `stop-${di}`),
-        [displayOrder]
-    );
+    const sortableIds = useMemo(() => {
+        const order =
+            displayOrder.length === formStops.length
+                ? displayOrder
+                : Array.from({ length: formStops.length }, (_, idx) => idx);
+        return order.map((di) => `stop-${di}`);
+    }, [displayOrder, formStops.length]);
 
     const predictionMap = useMemo(
         () => predictionStoreRef.current,
@@ -613,25 +625,6 @@ function ToGoList({
     const canSave = Boolean(isEditable && onSave && effectiveHasPendingChanges);
     const showUnsavedBadge = Boolean(isEditable && effectiveHasPendingChanges);
     const inputsDisabled = !isEditable;
-
-    // Debug information
-    useEffect(() => {
-        console.log("ToGoList Debug Info:", {
-            enableDrag,
-            hasOnMoveStop: !!onMoveStop,
-            formStops: formStops.length,
-            isEditable,
-            plan: !!plan,
-            draftStops: !!draftStops,
-        });
-    }, [
-        enableDrag,
-        onMoveStop,
-        formStops.length,
-        isEditable,
-        plan,
-        draftStops,
-    ]);
 
     const toggleStopDetails = (index: number) => {
         setExpandedStops((prev) => {
@@ -721,7 +714,36 @@ function ToGoList({
         if (!canSave) {
             return;
         }
-        // When saving, reset our local pending changes flag
+
+        // If the user has dragged items, ensure the parent gets the final order.
+        // We'll replay moves from current rendered ranks to identity order so
+        // the parent updates its source of truth accordingly.
+        if (onMoveStop && displayOrder.length === formStops.length) {
+            // We want items to end up in displayOrder order. We'll transform
+            // a working array of indices to match displayOrder by moving items
+            // to their target rank one by one and invoking onMoveStop for each.
+            const working = Array.from(
+                { length: formStops.length },
+                (_, i) => i
+            );
+            for (
+                let targetRank = 0;
+                targetRank < displayOrder.length;
+                targetRank++
+            ) {
+                const desiredIndex = displayOrder[targetRank];
+                const currentRank = working.indexOf(desiredIndex);
+                if (currentRank !== targetRank) {
+                    // Tell parent to move item from currentRank -> targetRank
+                    onMoveStop(currentRank, targetRank);
+                    // Update our working ranks to reflect the move
+                    const [moved] = working.splice(currentRank, 1);
+                    working.splice(targetRank, 0, moved);
+                }
+            }
+        }
+
+        // Now persist via parent's save
         setLocalHasPendingChanges(false);
         onSave?.();
         // Collapse any open stop details after saving
@@ -775,14 +797,6 @@ function ToGoList({
     };
 
     const handleDragEnd = (event: DragEndEvent) => {
-        // Add debug logging
-        console.log("Drag end event fired", {
-            hasOnMoveStop: !!onMoveStop,
-            active: event.active.id,
-            over: event.over?.id,
-            sortableIds,
-        });
-
         const { active, over } = event;
         if (!over) {
             return;
@@ -795,16 +809,23 @@ function ToGoList({
             return;
         }
 
+        const currentOrder =
+            displayOrder.length === formStops.length
+                ? displayOrder
+                : Array.from({ length: formStops.length }, (_, idx) => idx);
+        const sourceIndex = currentOrder[fromRank];
+        const destinationIndex = currentOrder[toRank];
+
         // Update focus tracking
         if (
             activeFieldRef.current &&
-            activeFieldRef.current.index === fromRank
+            activeFieldRef.current.index === sourceIndex
         ) {
             activeFieldRef.current = {
-                index: toRank,
+                index: destinationIndex,
                 field: activeFieldRef.current.field,
             };
-            pendingFocusIndexRef.current = toRank;
+            pendingFocusIndexRef.current = destinationIndex;
         }
 
         // Also update expanded stops state
@@ -843,36 +864,22 @@ function ToGoList({
             return newExpanded;
         });
 
-        // Update local display order immediately for visual result
         setDisplayOrder((prev) => {
-            const next = [...prev];
-            const [moved] = next.splice(fromRank, 1);
-            next.splice(toRank, 0, moved);
-            console.log("Updated display order", { prev, next });
-            return next;
+            const baseOrder =
+                prev.length === formStops.length ? [...prev] : currentOrder;
+            const movedIndex = baseOrder.splice(fromRank, 1)[0];
+            baseOrder.splice(toRank, 0, movedIndex);
+            return baseOrder;
         });
 
         // Mark that we have pending changes that need to be saved
         setLocalHasPendingChanges(true);
 
-        // If parent provided handler, call it
+        // If parent provided handler, call it with visible ranks so parent reorders
+        // according to the positions the user sees. Parent is responsible for
+        // updating its stops array (which will also update the map).
         if (onMoveStop) {
-            console.log("Calling onMoveStop", { fromRank, toRank });
-            // Make sure indices are within valid range before calling handler
-            if (
-                fromRank >= 0 &&
-                fromRank < formStops.length &&
-                toRank >= 0 &&
-                toRank < formStops.length
-            ) {
-                onMoveStop(fromRank, toRank);
-            } else {
-                console.error("Invalid indices for onMoveStop", {
-                    fromRank,
-                    toRank,
-                    formStopsLength: formStops.length,
-                });
-            }
+            onMoveStop(fromRank, toRank);
         }
     };
 
@@ -1081,7 +1088,13 @@ function ToGoList({
                                     Loading your stops…
                                 </li>
                             ) : formStops.length ? (
-                                displayOrder.map((displayIndex, rank) => {
+                                (displayOrder.length === formStops.length
+                                    ? displayOrder
+                                    : Array.from(
+                                          { length: formStops.length },
+                                          (_, idx) => idx
+                                      )
+                                ).map((displayIndex, rank) => {
                                     const stop = formStops[displayIndex];
                                     const isSelected =
                                         selectedStopIndex === displayIndex;
