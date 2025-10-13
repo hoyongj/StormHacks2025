@@ -127,7 +127,7 @@ function SortableStopItem({
                     aria-label="Drag to reorder"
                     {...listeners}
                 >
-                    <span aria-hidden="true">≡</span>
+                    <span aria-hidden="true">⋮⋮</span>
                 </button>
                 <button
                     type="button"
@@ -423,10 +423,15 @@ function ToGoList({
     onRemoveStop,
     onMoveStop,
     onSave,
-    hasPendingChanges = false,
+    hasPendingChanges: externalHasPendingChanges = false,
 }: ToGoListProps) {
     const formStops = draftStops ?? plan?.stops ?? [];
     const isEditable = Boolean(onUpdateStop);
+    // Local state to track whether there are pending changes from reordering
+    const [localHasPendingChanges, setLocalHasPendingChanges] = useState(false);
+    // Combine external and local pending changes
+    const effectiveHasPendingChanges =
+        externalHasPendingChanges || localHasPendingChanges;
     // const isEditable = true;
     const [expandedStops, setExpandedStops] = useState<Record<number, boolean>>(
         {}
@@ -605,8 +610,8 @@ function ToGoList({
         [predictionTick]
     );
 
-    const canSave = Boolean(isEditable && onSave && hasPendingChanges);
-    const showUnsavedBadge = Boolean(isEditable && hasPendingChanges);
+    const canSave = Boolean(isEditable && onSave && effectiveHasPendingChanges);
+    const showUnsavedBadge = Boolean(isEditable && effectiveHasPendingChanges);
     const inputsDisabled = !isEditable;
 
     // Debug information
@@ -716,6 +721,8 @@ function ToGoList({
         if (!canSave) {
             return;
         }
+        // When saving, reset our local pending changes flag
+        setLocalHasPendingChanges(false);
         onSave?.();
         // Collapse any open stop details after saving
         setExpandedStops({});
@@ -844,6 +851,9 @@ function ToGoList({
             console.log("Updated display order", { prev, next });
             return next;
         });
+
+        // Mark that we have pending changes that need to be saved
+        setLocalHasPendingChanges(true);
 
         // If parent provided handler, call it
         if (onMoveStop) {
