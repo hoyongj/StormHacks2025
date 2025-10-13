@@ -4,6 +4,7 @@ import os
 import logging
 import sqlite3
 from datetime import timedelta, datetime, timezone
+import re
 from typing import Annotated
 from uuid import UUID, uuid4
 from passlib.context import CryptContext
@@ -28,6 +29,10 @@ bcrypt_context = CryptContext(
     bcrypt__truncate_error=False,
 )
 
+PASSWORD_POLICY_ERROR = (
+    "Password must be at least 8 characters and include an uppercase letter, a number, and a special character."
+)
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     try:
@@ -39,6 +44,17 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def get_password_hash(password: str) -> str:
     # Explicitly use bcrypt_sha256 for new hashes
     return bcrypt_context.hash(password, scheme="bcrypt_sha256")
+
+
+def validate_password_requirements(password: str) -> None:
+    if len(password) < 8:
+        raise ValueError(PASSWORD_POLICY_ERROR)
+    if not re.search(r"[A-Z]", password):
+        raise ValueError(PASSWORD_POLICY_ERROR)
+    if not re.search(r"[0-9]", password):
+        raise ValueError(PASSWORD_POLICY_ERROR)
+    if not re.search(r"[^A-Za-z0-9]", password):
+        raise ValueError(PASSWORD_POLICY_ERROR)
 
 
 def _fetch_user_by_email(conn: sqlite3.Connection, email: str) -> dict | None:
@@ -101,6 +117,7 @@ def register_user(conn: sqlite3.Connection, register_user_request: models.Regist
         pwd_len = len(pwd_bytes)
         has_non_ascii = any(b > 127 for b in pwd_bytes)
         logging.info("Register: received password bytes length=%d, non_ascii=%s", pwd_len, has_non_ascii)
+        validate_password_requirements(register_user_request.password)
         user_id = str(uuid4())
         password_hash = get_password_hash(register_user_request.password)
         conn.execute(
@@ -151,6 +168,7 @@ def change_password(conn: sqlite3.Connection, user_id: str, current_password: st
         raise AuthenticationError()
     if not verify_password(current_password, user["password_hash"]):
         raise ValueError("Current password is incorrect")
+    validate_password_requirements(new_password)
     # Hash the new password and update
     new_hash = get_password_hash(new_password)
     conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, user_id))
