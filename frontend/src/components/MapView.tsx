@@ -202,7 +202,7 @@ function MapView({
                 }
 
                 const geocoder = new google.maps.Geocoder();
-                const stops = plan.stops.slice(0, 6);
+                const stops = plan.stops;
                 setMapError(null);
 
                 Promise.all(
