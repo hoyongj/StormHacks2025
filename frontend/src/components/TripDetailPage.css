@@ -107,10 +107,12 @@
     margin: 0;
     font-size: 1.8rem;
     font-weight: 700;
+    padding-left: 2rem;
 }
 
 .trip-detail-meta {
     margin: 0.4rem 0 0;
+    padding-left: 2rem;
     font-size: 0.85rem;
     opacity: 0.85;
 }
