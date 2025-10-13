@@ -24,6 +24,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Loader } from "@googlemaps/js-api-loader";
 import type { PlanStop, TravelPlan } from "../App";
 import "./ToGoList.css";
+import { UnfoldVertical } from "lucide-react";
 
 // Sortable item component for drag and drop functionality
 interface SortableStopItemProps {
@@ -132,7 +133,9 @@ function SortableStopItem({
                     aria-label="Drag to reorder"
                     {...listeners}
                 >
-                    <span aria-hidden="true">⋮⋮</span>
+                    <span aria-hidden="true">
+                        <UnfoldVertical size={16} />
+                    </span>
                 </button>
                 <button
                     type="button"
