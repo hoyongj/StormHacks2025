@@ -146,8 +146,11 @@ const AuthPage: React.FC = () => {
     const canSubmit = useMemo(() => {
         if (!email || !password) return false;
         if (!isLogin) {
-            // Basic password rules for registration
+            // Enforce strong password requirements for registration
             if (password.length < 8) return false;
+            if (!/[A-Z]/.test(password)) return false;
+            if (!/[0-9]/.test(password)) return false;
+            if (!/[^A-Za-z0-9]/.test(password)) return false;
         }
         return true;
     }, [email, password, isLogin]);
@@ -258,7 +261,7 @@ const AuthPage: React.FC = () => {
                                         placeholder={
                                             isLogin
                                                 ? "Your password"
-                                                : "Min 8 chars, mix recommended"
+                                                : "Min 8 chars incl. uppercase, number, special"
                                         }
                                         autoComplete={
                                             isLogin

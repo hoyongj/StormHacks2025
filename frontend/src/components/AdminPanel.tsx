@@ -50,10 +50,20 @@ const AdminPanel = ({ profile, onUpdateProfile }: AdminPanelProps) => {
         window.location.href = "/auth";
     };
 
+    const passwordMeetsPolicy = (pw: string) => {
+        if (pw.length < 8) return false;
+        if (!/[A-Z]/.test(pw)) return false;
+        if (!/[0-9]/.test(pw)) return false;
+        if (!/[^A-Za-z0-9]/.test(pw)) return false;
+        return true;
+    };
+
     const handleChangePassword = async () => {
         setServerMsg(null);
-        if (pwNew.length < 8) {
-            setServerMsg("New password must be at least 8 characters.");
+        if (!passwordMeetsPolicy(pwNew)) {
+            setServerMsg(
+                "New password must be at least 8 characters and include an uppercase letter, a number, and a special character."
+            );
             return;
         }
         if (pwNew !== pwConfirm) {
@@ -179,7 +189,7 @@ const AdminPanel = ({ profile, onUpdateProfile }: AdminPanelProps) => {
                                 type="password"
                                 value={pwNew}
                                 onChange={(e) => setPwNew(e.target.value)}
-                                placeholder="At least 8 characters"
+                                placeholder="8+ chars with uppercase, number, special"
                             />
                         </label>
                         <label className="admin__field">
