@@ -49,7 +49,6 @@ interface SortableStopItemProps {
         prediction: google.maps.places.AutocompletePrediction
     ) => void;
     handleNotesChange: (index: number, value: string) => void;
-    handlePlaceIdChange: (index: number, value: string) => void;
     handleTimePieceChange: (
         index: number,
         field: "timeToSpendDays" | "timeToSpendHours" | "timeToSpendMinutes",
@@ -84,7 +83,6 @@ function SortableStopItem({
     predictionMap,
     handlePredictionSelect,
     handleNotesChange,
-    handlePlaceIdChange,
     handleTimePieceChange,
     handleTimeClear,
     displayNameInputRefs,
@@ -106,6 +104,10 @@ function SortableStopItem({
         transition,
         zIndex: isDragging ? 10 : 0,
         opacity: isDragging ? 0.8 : 1,
+    };
+
+    const clearActiveFieldFocus = () => {
+        activeFieldRef.current = null;
     };
 
     return (
@@ -272,19 +274,7 @@ function SortableStopItem({
                         placeholder="Add optional notes"
                         rows={2}
                         disabled={detailInputsDisabled}
-                    />
-                </label>
-
-                <label className="to-go__field">
-                    <span>Place ID (optional)</span>
-                    <input
-                        type="text"
-                        value={stop.placeId ?? ""}
-                        onChange={(event) =>
-                            handlePlaceIdChange(index, event.target.value)
-                        }
-                        placeholder="ChIJ..."
-                        disabled={detailInputsDisabled}
+                        onFocus={clearActiveFieldFocus}
                     />
                 </label>
 
@@ -304,6 +294,7 @@ function SortableStopItem({
                             }
                             placeholder="0"
                             disabled={detailInputsDisabled}
+                            onFocus={clearActiveFieldFocus}
                         />
                     </label>
                     <label className="to-go__field to-go__field--compact">
@@ -322,6 +313,7 @@ function SortableStopItem({
                             }
                             placeholder="0"
                             disabled={detailInputsDisabled}
+                            onFocus={clearActiveFieldFocus}
                         />
                     </label>
                     <label className="to-go__field to-go__field--compact">
@@ -340,6 +332,7 @@ function SortableStopItem({
                             }
                             placeholder="0"
                             disabled={detailInputsDisabled}
+                            onFocus={clearActiveFieldFocus}
                         />
                     </label>
                     <button
@@ -666,11 +659,6 @@ function ToGoList({
 
     const handleNotesChange = (index: number, value: string) => {
         onUpdateStop?.(index, { notes: value.length ? value : "" });
-    };
-
-    const handlePlaceIdChange = (index: number, value: string) => {
-        const trimmed = value.trim();
-        onUpdateStop?.(index, { placeId: trimmed || undefined });
     };
 
     const handleTimePieceChange = (
@@ -1157,9 +1145,6 @@ function ToGoList({
                                             handleNotesChange={
                                                 handleNotesChange
                                             }
-                                            handlePlaceIdChange={
-                                                handlePlaceIdChange
-                                            }
                                             handleTimePieceChange={
                                                 handleTimePieceChange
                                             }
@@ -1411,22 +1396,10 @@ function ToGoList({
                                                 placeholder="Add optional notes"
                                                 rows={2}
                                                 disabled={detailInputsDisabled}
-                                            />
-                                        </label>
-
-                                        <label className="to-go__field">
-                                            <span>Place ID (optional)</span>
-                                            <input
-                                                type="text"
-                                                value={stop.placeId ?? ""}
-                                                onChange={(event) =>
-                                                    handlePlaceIdChange(
-                                                        index,
-                                                        event.target.value
-                                                    )
-                                                }
-                                                placeholder="ChIJ..."
-                                                disabled={detailInputsDisabled}
+                                                onFocus={() => {
+                                                    activeFieldRef.current =
+                                                        null;
+                                                }}
                                             />
                                         </label>
 
@@ -1451,6 +1424,10 @@ function ToGoList({
                                                     disabled={
                                                         detailInputsDisabled
                                                     }
+                                                    onFocus={() => {
+                                                        activeFieldRef.current =
+                                                            null;
+                                                    }}
                                                 />
                                             </label>
                                             <label className="to-go__field to-go__field--compact">
@@ -1474,6 +1451,10 @@ function ToGoList({
                                                     disabled={
                                                         detailInputsDisabled
                                                     }
+                                                    onFocus={() => {
+                                                        activeFieldRef.current =
+                                                            null;
+                                                    }}
                                                 />
                                             </label>
                                             <label className="to-go__field to-go__field--compact">
@@ -1497,6 +1478,10 @@ function ToGoList({
                                                     disabled={
                                                         detailInputsDisabled
                                                     }
+                                                    onFocus={() => {
+                                                        activeFieldRef.current =
+                                                            null;
+                                                    }}
                                                 />
                                             </label>
                                             <button
