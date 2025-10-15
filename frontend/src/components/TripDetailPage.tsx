@@ -224,7 +224,7 @@ function getStopTimeDetails(stop: PlanStop): string | null {
         stop.timeToSpendMinutes > 0
     )
         parts.push(`${stop.timeToSpendMinutes}m`);
-    return parts.length ? parts.join(" ") : null;
+    return parts.length ? `Time spent at stop: ${parts.join(" ")}` : null;
 }
 
 function getTravelModeIcon(mode?: string): string {

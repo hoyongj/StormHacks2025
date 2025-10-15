@@ -61,6 +61,7 @@ type PlanStopResponse = {
     display_name?: string | null;
     displayName?: string | null;
     description?: string | null;
+    notes?: string | null;
     placeId?: string | null;
     place_id?: string | null;
     latitude?: number | null;
@@ -1986,6 +1987,10 @@ function serializeStopForSave(stop: PlanStop) {
                 ? stop.displayName
                 : undefined,
         description: stop.description ?? "",
+        notes:
+            typeof stop.notes === "string" && stop.notes.length
+                ? stop.notes
+                : null,
         place_id: stop.placeId ?? null,
         latitude: typeof stop.latitude === "number" ? stop.latitude : null,
         longitude: typeof stop.longitude === "number" ? stop.longitude : null,
@@ -2032,6 +2037,10 @@ function normalizePlan(plan: TravelPlanResponse): TravelPlan {
                     ? stop.display_name
                     : stop.label,
             description: stop.description ?? undefined,
+            notes:
+                typeof stop.notes === "string" && stop.notes.length
+                    ? stop.notes
+                    : undefined,
             placeId: stop.placeId ?? stop.place_id ?? undefined,
             latitude:
                 typeof stop.latitude === "number" ? stop.latitude : undefined,

@@ -658,7 +658,7 @@ function ToGoList({
     };
 
     const handleNotesChange = (index: number, value: string) => {
-        onUpdateStop?.(index, { notes: value.length ? value : "" });
+        onUpdateStop?.(index, { notes: value.length ? value : undefined });
     };
 
     const handleTimePieceChange = (
