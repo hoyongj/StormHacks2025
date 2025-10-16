@@ -8,3 +8,4 @@ __pycache__
 .DS_Store
 backend/travel_plans.db
 video_idea.md
+dist
